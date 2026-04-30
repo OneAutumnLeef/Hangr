@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+    /* No tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Native form controls inherit the dark theme */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  select {
+    background-color: theme('colors.ink.800');
+    color: theme('colors.ink.50');
+  }
+  /* Make iOS date inputs not look like white aliens on a dark UI */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(0.75);
+    opacity: 0.6;
+  }
+}
+
+@layer components {
+  .form-input {
+    @apply w-full px-3 py-2.5 rounded-xl bg-ink-800 border border-ink-700 text-ink-50 placeholder-ink-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs;
+  }
+  .card {
+    @apply rounded-2xl bg-ink-800 border border-ink-800;
+  }
+}
+
+/* Top safe-area inset honored by Layout via padding-top */

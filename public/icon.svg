@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <g transform="translate(0, 16)" stroke="#a3e635" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Hook -->
+    <path d="M256 96 C256 56, 288 40, 312 56 C336 72, 336 104, 312 120 L256 152"/>
+    <!-- Hanger triangle -->
+    <path d="M256 152 L72 328 C60 340, 64 360, 80 364 L432 364 C448 360, 452 340, 440 328 L256 152 Z"/>
+    <!-- Crossbar -->
+    <line x1="88" y1="364" x2="424" y2="364"/>
+  </g>
+</svg>
