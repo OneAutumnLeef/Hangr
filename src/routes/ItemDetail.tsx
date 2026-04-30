@@ -115,7 +115,6 @@ export function ItemDetail() {
   const seedWearCount = item.seedWearCount ?? 0
   const totalWearCount = realWearCount + seedWearCount
   const lastRealWornAt = wears?.[0]?.wornAt
-  const lastWornAt = lastRealWornAt ?? item.seedAsOf
   const cpw =
     item.purchasePriceMinor != null && totalWearCount > 0
       ? item.purchasePriceMinor / 100 / totalWearCount
