@@ -5,6 +5,7 @@ import {
   Plus,
   X,
   CalendarCheck,
+  CalendarRange,
   ChevronDown,
   Pencil,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import { OutfitChip } from '@/components/OutfitChip'
 import { OutfitDetailSheet } from '@/components/OutfitDetailSheet'
 import { OutfitEditorSheet } from '@/components/OutfitEditorSheet'
 import { DayNoteSheet } from '@/components/DayNoteSheet'
+import { CalendarBackdateSheet } from '@/components/CalendarBackdateSheet'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/lib/toast'
 
@@ -74,6 +76,14 @@ export function Log() {
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set())
   // Which day's note is being edited (null = sheet closed).
   const [editingNoteDay, setEditingNoteDay] = useState<number | null>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+
+  // Wears for whichever day the picker is currently scoped to. Drives the
+  // excludeIds so the picker doesn't show items already logged for that day.
+  const pickerDayWears = useLiveQuery(
+    () => listWearsForDay(pickerDate),
+    [pickerDate],
+  )
 
   async function handleSaveDayNote(note: string) {
     if (editingNoteDay == null) return
@@ -165,7 +175,7 @@ export function Log() {
     }
     if (targetDate !== today && toAdd.length > 0) {
       toast.success(
-        `Logged ${toAdd.length} item${toAdd.length === 1 ? '' : 's'} for yesterday`,
+        `Logged ${toAdd.length} item${toAdd.length === 1 ? '' : 's'} for ${relativeDayLabel(targetDate)}`,
       )
     }
   }
@@ -272,13 +282,23 @@ export function Log() {
 
   return (
     <div className="px-5 pt-12 pb-4 max-w-md mx-auto">
-      <header className="mb-7">
-        <h1 className="font-display text-[28px] font-semibold tracking-tight text-ink-50 leading-tight">
-          Log
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-300 tabular-nums">
-          Today · {shortDate(today)}
-        </p>
+      <header className="mb-7 flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="font-display text-[28px] font-semibold tracking-tight text-ink-50 leading-tight">
+            Log
+          </h1>
+          <p className="mt-1 text-[13px] text-ink-300 tabular-nums">
+            Today · {shortDate(today)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Backdate via calendar"
+          className="shrink-0 mt-1 h-9 w-9 rounded-full border border-hairline bg-surface-1 text-ink-300 hover:text-accent hover:border-accent/50 flex items-center justify-center transition-colors"
+        >
+          <CalendarRange size={16} strokeWidth={1.75} />
+        </button>
       </header>
 
       {/* Yesterday backfill prompt — friction killer for missed days */}
@@ -557,15 +577,13 @@ export function Log() {
         title={
           pickerDate === today
             ? "Log today's outfit"
-            : "Log yesterday's outfit"
+            : `Log ${relativeDayLabel(pickerDate)}'s outfit`
         }
-        excludeIds={
-          pickerDate === today
-            ? todayItemIds
-            : (yesterdayWears?.map((w) => w.itemId) ?? [])
-        }
+        excludeIds={pickerDayWears?.map((w) => w.itemId) ?? []}
         confirmLabel={
-          pickerDate === today ? 'Add to today' : 'Add to yesterday'
+          pickerDate === today
+            ? 'Add to today'
+            : `Add to ${relativeDayLabel(pickerDate).toLowerCase()}`
         }
       />
 
@@ -607,6 +625,16 @@ export function Log() {
         }
         onClose={() => setEditingNoteDay(null)}
         onSave={handleSaveDayNote}
+      />
+
+      <CalendarBackdateSheet
+        open={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+        onSelect={(dayMs) => {
+          setCalendarOpen(false)
+          setPickerDate(dayMs)
+          setPickerOpen(true)
+        }}
       />
     </div>
   )
