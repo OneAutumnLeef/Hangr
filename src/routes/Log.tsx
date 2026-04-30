@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, CalendarCheck, ChevronRight } from 'lucide-react'
-import { db } from '@/db/dexie'
 import { listItems } from '@/db/items'
 import {
   deleteWear,
