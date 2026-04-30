@@ -7,6 +7,7 @@ import {
   Loader2,
   Wand2,
   X,
+  Layers,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { processPhoto, type ProcessedPhoto } from '@/lib/photo'
@@ -323,6 +324,19 @@ export function Capture() {
             <ImagePlus size={20} />
             Pick from gallery
           </button>
+
+          <Link
+            to="/capture/bulk"
+            className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-ink-900 border border-ink-800 text-ink-200 active:scale-[0.99] transition"
+          >
+            <Layers size={20} />
+            <div className="flex-1 text-left">
+              <div className="text-sm">Add many at once</div>
+              <div className="text-xs text-ink-500">
+                Pick a batch from your gallery — review and save together
+              </div>
+            </div>
+          </Link>
 
           <input
             ref={cameraInputRef}
