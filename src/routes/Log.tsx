@@ -1,26 +1,42 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Trash2, CalendarCheck, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, CalendarCheck, ChevronRight, Bookmark } from 'lucide-react'
 import { listItems } from '@/db/items'
 import {
   deleteWear,
   listRecentWearDays,
   listWearsForDay,
+  logSavedOutfit,
   logWear,
 } from '@/db/wears'
+import {
+  archiveOutfit,
+  createOutfit,
+  listOutfits,
+  updateOutfit,
+} from '@/db/outfits'
+import type { Outfit } from '@/db/dexie'
 import { startOfDay, relativeDayLabel, shortDate } from '@/lib/dates'
 import { MiniItemThumb } from '@/components/MiniItemThumb'
 import { ItemPickerSheet } from '@/components/ItemPickerSheet'
+import { OutfitChip } from '@/components/OutfitChip'
+import { OutfitDetailSheet } from '@/components/OutfitDetailSheet'
+import { OutfitEditorSheet } from '@/components/OutfitEditorSheet'
 import { EmptyState } from '@/components/EmptyState'
+import { toast } from '@/lib/toast'
 
 export function Log() {
   const today = startOfDay()
   const items = useLiveQuery(() => listItems({ includeArchived: true }))
   const todayWears = useLiveQuery(() => listWearsForDay(today), [today])
   const recentDays = useLiveQuery(() => listRecentWearDays(30))
+  const outfits = useLiveQuery(() => listOutfits())
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [detailOutfit, setDetailOutfit] = useState<Outfit | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editingOutfit, setEditingOutfit] = useState<Outfit | null>(null)
 
   const itemMap = useMemo(() => {
     const m = new Map<string, NonNullable<typeof items>[number]>()
@@ -48,6 +64,60 @@ export function Log() {
   async function removeWear(wearId: string) {
     await deleteWear(wearId)
   }
+
+  async function handleWearOutfit(outfit: Outfit) {
+    const already = new Set(todayItemIds)
+    const toAdd = outfit.itemIds.filter((id) => !already.has(id))
+    if (toAdd.length === 0) {
+      toast.info('Already in today')
+      setDetailOutfit(null)
+      return
+    }
+    await logSavedOutfit({ id: outfit.id, itemIds: toAdd }, today)
+    setDetailOutfit(null)
+    toast.success(`Logged "${outfit.name}"`)
+  }
+
+  async function handleSaveOutfit(values: {
+    name: string
+    itemIds: string[]
+  }) {
+    if (editingOutfit) {
+      await updateOutfit(editingOutfit.id, values)
+      toast.success('Outfit updated')
+    } else {
+      await createOutfit(values)
+      toast.success('Outfit saved')
+    }
+    setEditorOpen(false)
+    setEditingOutfit(null)
+  }
+
+  async function handleDeleteOutfit(outfit: Outfit) {
+    await archiveOutfit(outfit.id)
+    setDetailOutfit(null)
+    toast.success('Outfit removed')
+  }
+
+  function openNewOutfit() {
+    setEditingOutfit(null)
+    setEditorOpen(true)
+  }
+
+  function openEditOutfit(outfit: Outfit) {
+    setDetailOutfit(null)
+    setEditingOutfit(outfit)
+    setEditorOpen(true)
+  }
+
+  // Whether every member of the active detail outfit is already worn today —
+  // disables the "Wear today" CTA.
+  const detailAllWorn = useMemo(() => {
+    if (!detailOutfit) return false
+    if (detailOutfit.itemIds.length === 0) return true
+    const set = new Set(todayItemIds)
+    return detailOutfit.itemIds.every((id) => set.has(id))
+  }, [detailOutfit, todayItemIds])
 
   if (items === undefined || todayWears === undefined) {
     return (
@@ -78,6 +148,56 @@ export function Log() {
           What you wore, day by day
         </p>
       </header>
+
+      {/* Saved outfits — quick-log rail above today */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Bookmark size={14} className="text-ink-400" />
+            <span className="text-sm font-medium text-ink-100">
+              Saved outfits
+            </span>
+          </div>
+          {outfits && outfits.length > 0 && (
+            <button
+              onClick={openNewOutfit}
+              className="text-xs text-accent"
+            >
+              + New
+            </button>
+          )}
+        </div>
+        {outfits === undefined ? (
+          <div className="h-32 rounded-xl bg-ink-800 animate-pulse" />
+        ) : outfits.length === 0 ? (
+          <button
+            onClick={openNewOutfit}
+            className="w-full px-4 py-3 rounded-2xl border-2 border-dashed border-ink-700 text-ink-400 hover:text-accent hover:border-accent flex items-center justify-center gap-2 transition"
+          >
+            <Plus size={16} />
+            <span className="text-sm">
+              Save outfits for one-tap logging
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-stretch gap-3 overflow-x-auto -mx-4 px-4 pb-1">
+            {outfits.map((o) => (
+              <OutfitChip
+                key={o.id}
+                outfit={o}
+                onClick={() => setDetailOutfit(o)}
+              />
+            ))}
+            <button
+              onClick={openNewOutfit}
+              className="shrink-0 w-28 aspect-square rounded-xl border-2 border-dashed border-ink-700 text-ink-400 hover:text-accent hover:border-accent flex flex-col items-center justify-center gap-1 transition"
+            >
+              <Plus size={20} />
+              <span className="text-[10px]">New outfit</span>
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* Today's outfit */}
       <section className="mb-8">
@@ -202,6 +322,34 @@ export function Log() {
         title="Log today's outfit"
         excludeIds={todayItemIds}
         confirmLabel="Add to today"
+      />
+
+      <OutfitDetailSheet
+        outfit={detailOutfit}
+        onClose={() => setDetailOutfit(null)}
+        onWearToday={() =>
+          detailOutfit && handleWearOutfit(detailOutfit)
+        }
+        onEdit={() => detailOutfit && openEditOutfit(detailOutfit)}
+        onDelete={() => detailOutfit && handleDeleteOutfit(detailOutfit)}
+        alreadyAllWorn={detailAllWorn}
+      />
+
+      <OutfitEditorSheet
+        open={editorOpen}
+        onClose={() => {
+          setEditorOpen(false)
+          setEditingOutfit(null)
+        }}
+        onSave={handleSaveOutfit}
+        initial={
+          editingOutfit
+            ? {
+                name: editingOutfit.name,
+                itemIds: editingOutfit.itemIds,
+              }
+            : undefined
+        }
       />
     </div>
   )

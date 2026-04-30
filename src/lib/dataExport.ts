@@ -8,10 +8,11 @@ import { db } from '@/db/dexie'
  * old shapes if we ever ship import.
  */
 export async function exportAllData(): Promise<Blob> {
-  const [items, photos, wears] = await Promise.all([
+  const [items, photos, wears, outfits] = await Promise.all([
     db.items.toArray(),
     db.itemPhotos.toArray(),
     db.wears.toArray(),
+    db.outfits.toArray(),
   ])
 
   const photosWithDataUrl = await Promise.all(
@@ -27,11 +28,12 @@ export async function exportAllData(): Promise<Blob> {
   )
 
   const dump = {
-    schema: 'hangr/v1',
+    schema: 'hangr/v2',
     exportedAt: new Date().toISOString(),
     items,
     itemPhotos: photosWithDataUrl,
     wears,
+    outfits,
   }
 
   return new Blob([JSON.stringify(dump)], { type: 'application/json' })
@@ -39,11 +41,19 @@ export async function exportAllData(): Promise<Blob> {
 
 /** Wipe all Hangr data from this device. Irreversible. */
 export async function deleteAllData() {
-  await db.transaction('rw', db.items, db.itemPhotos, db.wears, async () => {
-    await db.items.clear()
-    await db.itemPhotos.clear()
-    await db.wears.clear()
-  })
+  await db.transaction(
+    'rw',
+    db.items,
+    db.itemPhotos,
+    db.wears,
+    db.outfits,
+    async () => {
+      await db.items.clear()
+      await db.itemPhotos.clear()
+      await db.wears.clear()
+      await db.outfits.clear()
+    },
+  )
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

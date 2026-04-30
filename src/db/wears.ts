@@ -1,4 +1,4 @@
-import { db, type Wear } from './dexie'
+import { db, type Outfit, type Wear } from './dexie'
 import { makeId } from '@/lib/utils'
 import { startOfDay } from '@/lib/dates'
 
@@ -42,6 +42,28 @@ export async function logOutfit(
     })),
   )
   return outfitId
+}
+
+/**
+ * Log a wear for every item in a saved Outfit, all sharing the outfit's id
+ * as `outfitId`. Reusing the saved outfit's id (rather than minting a fresh
+ * group id) lets future analytics ask "how often is this saved outfit worn."
+ */
+export async function logSavedOutfit(
+  outfit: Pick<Outfit, 'id' | 'itemIds'>,
+  date: number = startOfDay(),
+): Promise<string[]> {
+  const now = Date.now()
+  const wears: Wear[] = outfit.itemIds.map((itemId) => ({
+    id: makeId('wear'),
+    itemId,
+    wornAt: date,
+    source: 'manual' as const,
+    outfitId: outfit.id,
+    createdAt: now,
+  }))
+  await db.wears.bulkAdd(wears)
+  return wears.map((w) => w.id)
 }
 
 export async function deleteWear(id: string) {

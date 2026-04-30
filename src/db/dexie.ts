@@ -81,9 +81,29 @@ export interface Wear {
   wornAt: number
   /** How the wear was logged. */
   source: 'manual' | 'selfie' | 'inferred' | 'backdated'
-  /** Optional outfit grouping; multiple wears with the same outfitId form an outfit. */
+  /**
+   * Optional outfit grouping. When the wear was logged via a saved Outfit, this
+   * holds that outfit's id; that lets analytics ask "how often is this outfit
+   * worn." Otherwise it's a per-instance group id from `logOutfit()`.
+   */
   outfitId?: string
   createdAt: number
+}
+
+/**
+ * A named bundle of items the user wears together regularly. Tapping a saved
+ * outfit logs a wear for each item in one go — the friction killer for repeat
+ * combos like "Friday casual" or "gym kit."
+ */
+export interface Outfit {
+  id: string
+  name: string
+  /** Member item ids, ordered. Refers to `items.id` (may include archived). */
+  itemIds: string[]
+  createdAt: number
+  updatedAt: number
+  /** Soft delete; null/undefined = active. */
+  archivedAt?: number
 }
 
 // ─── Dexie schema ───────────────────────────────────────────────────────────
@@ -92,12 +112,14 @@ const db = new Dexie('hangr') as Dexie & {
   items: EntityTable<Item, 'id'>
   itemPhotos: EntityTable<ItemPhoto, 'id'>
   wears: EntityTable<Wear, 'id'>
+  outfits: EntityTable<Outfit, 'id'>
 }
 
 // v1 — initial schema
 // v2 — add archivedReason, archivedNote, seedWearCount, seedAsOf to Item.
 //      Non-indexed fields don't strictly need a version bump, but keeping a
 //      record of schema evolution makes future migrations easier to reason about.
+// v3 — add outfits table (saved outfit definitions for one-tap logging).
 db.version(1).stores({
   items: 'id, category, archivedAt, createdAt, source',
   itemPhotos: 'id, itemId, createdAt',
@@ -107,6 +129,12 @@ db.version(2).stores({
   items: 'id, category, archivedAt, createdAt, source',
   itemPhotos: 'id, itemId, createdAt',
   wears: 'id, itemId, wornAt, outfitId, createdAt',
+})
+db.version(3).stores({
+  items: 'id, category, archivedAt, createdAt, source',
+  itemPhotos: 'id, itemId, createdAt',
+  wears: 'id, itemId, wornAt, outfitId, createdAt',
+  outfits: 'id, archivedAt, createdAt',
 })
 
 // Useful for ad-hoc inspection in DevTools while building.
