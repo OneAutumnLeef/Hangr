@@ -6,10 +6,16 @@ import path from 'node:path'
 // Hangr is served from the `/Hangr/` subpath under derajyojith.dev. Every
 // asset URL, the React Router basename, the PWA scope, and the workbox SPA
 // fallback all need to know that — change them together via this constant.
-const BASE = '/Hangr/'
+//
+// Subpath only kicks in for production builds (`vite build`). `vite dev`
+// still serves at the root so localhost:5173/closet works as expected
+// without remembering a prefix.
+const PROD_BASE = '/Hangr/'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  const BASE = command === 'build' ? PROD_BASE : '/'
+  return {
   base: BASE,
   plugins: [
     react(),
@@ -96,4 +102,5 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
+  }
 })
