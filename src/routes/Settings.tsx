@@ -7,6 +7,7 @@ import {
   HardDrive,
   Github,
   Cpu,
+  Bug,
 } from 'lucide-react'
 import { db } from '@/db/dexie'
 import {
@@ -18,6 +19,7 @@ import {
 } from '@/lib/dataExport'
 import { toast } from '@/lib/toast'
 import { isIOS, usePrefs } from '@/lib/preferences'
+import { DiagnosticsView } from '@/components/DiagnosticsView'
 
 export function Settings() {
   const itemCount = useLiveQuery(() => db.items.count())
@@ -171,6 +173,10 @@ export function Settings() {
             </div>
           </div>
         </button>
+      </Section>
+
+      <Section icon={<Bug size={16} />} title="Diagnostics">
+        <DiagnosticsView />
       </Section>
 
       <Section icon={<Github size={16} />} title="About">
