@@ -518,6 +518,49 @@ async function generatePlaceholder(opts: {
 }
 
 /**
+ * Compute + store CLIP embeddings for every active item that doesn't have
+ * one yet. Used by the Settings dev row to backfill duplicate-detection
+ * data after adding items pre-feature.
+ */
+export async function backfillEmbeddings(
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ indexed: number; skipped: number; failed: number }> {
+  const { indexItemPhoto } = await import('@/lib/embeddings')
+  const items = await db.items.toArray()
+  const existing = new Set(
+    (await db.itemEmbeddings.toArray()).map((e) => e.itemId),
+  )
+  const missing = items.filter(
+    (it) => !it.archivedAt && it.primaryPhotoId && !existing.has(it.id),
+  )
+  let indexed = 0
+  let failed = 0
+  for (let i = 0; i < missing.length; i++) {
+    const item = missing[i]
+    onProgress?.(i, missing.length)
+    try {
+      const photo = await db.itemPhotos.get(item.primaryPhotoId!)
+      if (!photo?.blob) {
+        failed += 1
+        continue
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await indexItemPhoto(item.id, photo.blob)
+      indexed += 1
+    } catch (err) {
+      console.warn('[backfill] failed for', item.name, err)
+      failed += 1
+    }
+  }
+  onProgress?.(missing.length, missing.length)
+  return {
+    indexed,
+    skipped: items.length - missing.length,
+    failed,
+  }
+}
+
+/**
  * For every active item without a `primaryPhotoId`, generate a colored
  * canvas placeholder based on the item's stored color + category. Lets the
  * test wardrobe render visually even when items were added without ML

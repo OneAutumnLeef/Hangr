@@ -47,7 +47,15 @@ export async function exportAllData(): Promise<Blob> {
 export async function deleteAllData() {
   await db.transaction(
     'rw',
-    [db.items, db.itemPhotos, db.wears, db.outfits, db.dayNotes, db.wants],
+    [
+      db.items,
+      db.itemPhotos,
+      db.wears,
+      db.outfits,
+      db.dayNotes,
+      db.wants,
+      db.itemEmbeddings,
+    ],
     async () => {
       await db.items.clear()
       await db.itemPhotos.clear()
@@ -55,6 +63,7 @@ export async function deleteAllData() {
       await db.outfits.clear()
       await db.dayNotes.clear()
       await db.wants.clear()
+      await db.itemEmbeddings.clear()
     },
   )
 }

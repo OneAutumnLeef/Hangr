@@ -127,6 +127,21 @@ export interface DayNote {
 }
 
 /**
+ * CLIP image embedding for an item, used by visual duplicate detection at
+ * capture time. Float32Array of length 512 (CLIP-base output dim). Stored
+ * separately from items so embeddings can be lazily computed / backfilled
+ * without touching the items table.
+ */
+export interface ItemEmbedding {
+  /** Foreign key into `items.id` — also the primary key here. */
+  itemId: string
+  embedding: Float32Array
+  /** Embedding model id, in case we ever swap to a stronger one. */
+  model: string
+  createdAt: number
+}
+
+/**
  * Pre-purchase consideration. Items the user is THINKING about buying — used
  * to gut-check against existing inventory ("you already own 4 white shirts")
  * before pulling the trigger. Once decided, the row is archived (kept for
@@ -159,6 +174,7 @@ const db = new Dexie('hangr') as Dexie & {
   outfits: EntityTable<Outfit, 'id'>
   dayNotes: EntityTable<DayNote, 'dayMs'>
   wants: EntityTable<Want, 'id'>
+  itemEmbeddings: EntityTable<ItemEmbedding, 'itemId'>
 }
 
 // v1 — initial schema
@@ -209,6 +225,16 @@ db.version(6).stores({
   outfits: 'id, archivedAt, createdAt',
   dayNotes: '&dayMs, updatedAt',
   wants: 'id, decision, createdAt, decidedAt',
+})
+// v7 — CLIP image embeddings keyed by itemId, for visual duplicate detection.
+db.version(7).stores({
+  items: 'id, category, archivedAt, createdAt, source, *occasions',
+  itemPhotos: 'id, itemId, createdAt',
+  wears: 'id, itemId, wornAt, outfitId, createdAt',
+  outfits: 'id, archivedAt, createdAt',
+  dayNotes: '&dayMs, updatedAt',
+  wants: 'id, decision, createdAt, decidedAt',
+  itemEmbeddings: '&itemId, model, createdAt',
 })
 
 // Useful for ad-hoc inspection in DevTools while building.

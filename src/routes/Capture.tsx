@@ -7,6 +7,7 @@ import {
   Loader2,
   X,
   Layers,
+  AlertCircle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { processPhoto, type ProcessedPhoto } from '@/lib/photo'
@@ -16,8 +17,16 @@ import {
   detectDominantColor,
   ensureClassifierLoaded,
 } from '@/lib/detection'
+import {
+  extractEmbedding,
+  findSimilarItems,
+  storeItemEmbedding,
+  type SimilarItem,
+} from '@/lib/embeddings'
 import { ItemForm, type ItemFormValues } from '@/components/ItemForm'
-import { createItem } from '@/db/items'
+import { createItem, getItemPhoto } from '@/db/items'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, type Item } from '@/db/dexie'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { isIOS, usePrefs } from '@/lib/preferences'
@@ -55,6 +64,10 @@ export function Capture() {
   const [detectionError, setDetectionError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [elapsedSec, setElapsedSec] = useState(0)
+  // Visual-duplicate check results. The new item's embedding is computed in
+  // background after bg-removal and compared against existing items.
+  const [similarItems, setSimilarItems] = useState<SimilarItem[]>([])
+  const newItemEmbeddingRef = useRef<Float32Array | null>(null)
 
   // Each capture (or "Skip") bumps this — any stale ML callbacks check it
   // and bail if their session id no longer matches.
@@ -94,6 +107,8 @@ export function Capture() {
     setDetected(null)
     setDetecting(false)
     setDetectionError(null)
+    setSimilarItems([])
+    newItemEmbeddingRef.current = null
   }
 
   /** User taps "Skip" — drop ML, keep the original photo, show the form. */
@@ -231,6 +246,28 @@ export function Capture() {
         setDetecting(false)
       }
     }
+
+    if (sessionIdRef.current !== mySession) return
+
+    // Visual duplicate check — runs after detection so we use the same
+    // (preferably cutout) source. Failures here are silent: the user can
+    // still save the item; they just don't get the warning banner.
+    try {
+      const sourceBlob = cutout?.blob ?? original.blob
+      const emb = await extractEmbedding(sourceBlob)
+      if (sessionIdRef.current !== mySession) return
+      newItemEmbeddingRef.current = emb
+      const matches = await findSimilarItems(sourceBlob, {
+        threshold: 0.88,
+        limit: 3,
+      })
+      if (sessionIdRef.current !== mySession) return
+      setSimilarItems(matches)
+    } catch (err) {
+      // Embedding extraction can OOM on iOS or fail mid-load. Don't surface
+      // — duplicate detection is best-effort, not blocking.
+      console.warn('Duplicate-check embedding failed:', err)
+    }
   }
 
   async function handleSave(values: ItemFormValues) {
@@ -244,7 +281,7 @@ export function Capture() {
     setSaving(true)
     setError(null)
     try {
-      await createItem({
+      const item = await createItem({
         name: values.name,
         category: values.category,
         color: values.color,
@@ -262,6 +299,15 @@ export function Capture() {
           isProcessed,
         },
       })
+      // Cache the embedding we already computed so future duplicate checks
+      // include this item. Best-effort; failure here doesn't block save.
+      if (newItemEmbeddingRef.current) {
+        try {
+          await storeItemEmbedding(item.id, newItemEmbeddingRef.current)
+        } catch (err) {
+          console.warn('Could not store embedding:', err)
+        }
+      }
       clearVariants()
       toast.success(`Saved "${values.name}" to closet`)
       navigate('/closet')
@@ -509,6 +555,11 @@ export function Capture() {
             </div>
           )}
 
+          {/* Visual-duplicate banner — only when we found at least one match */}
+          {similarItems.length > 0 && (
+            <DuplicateBanner matches={similarItems} />
+          )}
+
           <ItemForm
             onSubmit={handleSave}
             disabled={saving}
@@ -525,5 +576,96 @@ export function Capture() {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Banner shown above the form when the new photo's CLIP embedding closely
+ * matches existing items. Doesn't block saving — just makes the user think
+ * twice. Threshold of 0.88 cosine reliably catches near-duplicates without
+ * spamming on every "I own a few black tops" overlap.
+ */
+function DuplicateBanner({ matches }: { matches: SimilarItem[] }) {
+  return (
+    <div className="rounded-card border border-warning/40 bg-warning/10 p-3">
+      <div className="flex items-start gap-2 mb-3">
+        <AlertCircle
+          size={14}
+          strokeWidth={2}
+          className="text-warning shrink-0 mt-0.5"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] text-warning font-medium">
+            You may already own this
+          </div>
+          <div className="text-[11px] text-warning/80 mt-0.5 leading-snug">
+            Close visual match{matches.length > 1 ? 'es' : ''} found in your
+            closet. Tap to compare.
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {matches.map((m) => (
+          <DuplicateMatchRow key={m.itemId} match={m} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DuplicateMatchRow({ match }: { match: SimilarItem }) {
+  const item = useLiveQuery(
+    () => db.items.get(match.itemId) as Promise<Item | undefined>,
+    [match.itemId],
+  )
+  const photo = useLiveQuery(
+    () =>
+      item?.primaryPhotoId
+        ? getItemPhoto(item.primaryPhotoId)
+        : Promise.resolve(undefined),
+    [item?.primaryPhotoId],
+  )
+  const [url, setUrl] = useState<string | undefined>()
+  useEffect(() => {
+    if (!photo?.blob) {
+      setUrl(undefined)
+      return
+    }
+    const u = URL.createObjectURL(photo.blob)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [photo?.blob])
+
+  if (!item) return null
+  const pct = Math.round(match.score * 100)
+
+  return (
+    <Link
+      to={`/closet/${item.id}`}
+      className="flex items-center gap-3 rounded-card bg-surface-1 border border-hairline px-2.5 py-2 hover:border-warning/40 transition-colors"
+    >
+      <div className="h-10 w-10 shrink-0 rounded-md overflow-hidden bg-surface-2 flex items-center justify-center">
+        {url ? (
+          <img
+            src={url}
+            alt={item.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-tertiary text-[10px] text-center px-1">
+            {item.name.slice(0, 2)}
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] text-ink-50 truncate">{item.name}</div>
+        <div className="text-[11px] text-tertiary truncate">
+          {[item.category, item.brand].filter(Boolean).join(' · ') || '—'}
+        </div>
+      </div>
+      <div className="text-[11px] font-semibold tabular-nums text-warning">
+        {pct}%
+      </div>
+    </Link>
   )
 }

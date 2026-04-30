@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, Trash2, ChevronDown, Sparkles, Image as ImageIcon } from 'lucide-react'
+import { Download, Trash2, ChevronDown, Sparkles, Image as ImageIcon, Search } from 'lucide-react'
 import { db } from '@/db/dexie'
 import {
   deleteAllData,
@@ -16,7 +16,11 @@ import { DiagnosticsView } from '@/components/DiagnosticsView'
 import { cn } from '@/lib/utils'
 // TEMP — demo data seeder. Remove this import + the row below + the file
 // itself (`src/lib/seedData.ts`) once you're done evaluating the new UI.
-import { fillMissingPhotos, seedExampleData } from '@/lib/seedData'
+import {
+  backfillEmbeddings,
+  fillMissingPhotos,
+  seedExampleData,
+} from '@/lib/seedData'
 
 export function Settings() {
   const itemCount = useLiveQuery(() => db.items.count())
@@ -109,6 +113,29 @@ export function Settings() {
       setBusy(false)
     }
   }
+
+  // Compute CLIP embeddings for items that don't have one yet, so the
+  // duplicate-detection check at capture time has a complete reference set.
+  // First run downloads the model (~80 MB cached after).
+  async function handleBackfillEmbeddings() {
+    setBusy(true)
+    toast.info('Indexing photos for duplicate detection…')
+    try {
+      const { indexed, failed } = await backfillEmbeddings()
+      if (indexed === 0 && failed === 0) {
+        toast.info('Everything already indexed')
+      } else {
+        const failNote = failed > 0 ? ` · ${failed} failed` : ''
+        toast.success(`Indexed ${indexed} item${indexed === 1 ? '' : 's'}${failNote}`)
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Indexing failed — check console')
+    } finally {
+      setBusy(false)
+    }
+  }
+
 
   const isEmpty = (itemCount ?? 0) === 0
   const usagePct =
@@ -261,6 +288,23 @@ export function Settings() {
                   </div>
                 </div>
                 <ImageIcon
+                  size={18}
+                  strokeWidth={1.75}
+                  className="text-accent shrink-0"
+                />
+              </RowButton>
+
+              <RowButton onClick={handleBackfillEmbeddings} disabled={busy}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] text-ink-50">
+                    Index for duplicate detection
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-tertiary">
+                    Compute CLIP embeddings for existing items so capture warns
+                    when you may already own something similar.
+                  </div>
+                </div>
+                <Search
                   size={18}
                   strokeWidth={1.75}
                   className="text-accent shrink-0"
