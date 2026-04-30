@@ -8,6 +8,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { processPhoto, type ProcessedPhoto } from '@/lib/photo'
 import { removeBackground, type BgRemovalProgress } from '@/lib/bgRemoval'
 import {
@@ -19,6 +20,7 @@ import { ItemForm, type ItemFormValues } from '@/components/ItemForm'
 import { createItem } from '@/db/items'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { isIOS, usePrefs } from '@/lib/preferences'
 
 interface VariantState {
   original: ProcessedPhoto
@@ -36,6 +38,7 @@ interface DetectedSuggestions {
 
 export function Capture() {
   const navigate = useNavigate()
+  const mlEnabled = usePrefs((s) => s.mlEnabled)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [variants, setVariants] = useState<VariantState | null>(null)
@@ -121,7 +124,13 @@ export function Capture() {
       const original = await processPhoto(file)
       setVariants({ original })
       setBusy(false)
-      void runPipeline(original)
+      // Skip ML entirely when disabled (default on iOS to avoid memory kills).
+      if (mlEnabled) {
+        void runPipeline(original)
+      } else {
+        // Mark cutout as "skipped" so the variant toggle stays sensibly disabled.
+        setShowVariant('original')
+      }
     } catch (err) {
       console.error(err)
       setError('Could not read that image. Try another.')
@@ -148,6 +157,19 @@ export function Capture() {
       })
       if (sessionIdRef.current !== mySession) return // user skipped or retook
       const url = URL.createObjectURL(result.blob)
+      // Pre-decode so the <img> swap is instant — avoids the brief "blank" flash
+      // when a freshly-minted Blob URL is set as src and the browser hasn't
+      // decoded it yet.
+      await new Promise<void>((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve()
+        img.onerror = () => resolve() // don't block on decode errors; render will handle
+        img.src = url
+      })
+      if (sessionIdRef.current !== mySession) {
+        URL.revokeObjectURL(url)
+        return
+      }
       cutout = {
         blob: result.blob,
         width: result.width,
@@ -374,35 +396,50 @@ export function Capture() {
             )}
           </div>
 
-          {/* Variant toggle */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1 bg-ink-800 rounded-full p-1">
-              <button
-                onClick={() => setShowVariant('cutout')}
-                disabled={!variants.cutout || removing}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium transition disabled:opacity-40',
-                  showVariant === 'cutout'
-                    ? 'bg-ink-700 text-ink-50'
-                    : 'text-ink-400',
-                )}
-              >
-                <Sparkles size={12} className="inline mr-1 -mt-0.5" />
-                Cutout
-              </button>
-              <button
-                onClick={() => setShowVariant('original')}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium transition',
-                  showVariant === 'original'
-                    ? 'bg-ink-700 text-ink-50'
-                    : 'text-ink-400',
-                )}
-              >
-                Original
-              </button>
+          {/* Variant toggle — only when ML is enabled. With ML off, we
+              save the original and skip the cutout/original UI entirely. */}
+          {mlEnabled && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1 bg-ink-800 rounded-full p-1">
+                <button
+                  onClick={() => setShowVariant('cutout')}
+                  disabled={!variants.cutout || removing}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition disabled:opacity-40',
+                    showVariant === 'cutout'
+                      ? 'bg-ink-700 text-ink-50'
+                      : 'text-ink-400',
+                  )}
+                >
+                  <Sparkles size={12} className="inline mr-1 -mt-0.5" />
+                  Cutout
+                </button>
+                <button
+                  onClick={() => setShowVariant('original')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition',
+                    showVariant === 'original'
+                      ? 'bg-ink-700 text-ink-50'
+                      : 'text-ink-400',
+                  )}
+                >
+                  Original
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* When ML is off, show a tiny note explaining what's happening */}
+          {!mlEnabled && (
+            <div className="text-xs text-ink-500">
+              Saving photo as-is.{' '}
+              {isIOS ? 'On-device ML is off by default on iOS to avoid memory issues. ' : ''}
+              <Link to="/settings" className="text-accent">
+                Enable in Settings
+              </Link>
+              .
+            </div>
+          )}
 
           {/* Surface bg removal error inline so users can debug without devtools */}
           {variants.cutoutFailed && (

@@ -8,10 +8,11 @@ import { Insights } from './routes/Insights'
 import { Settings } from './routes/Settings'
 import { InstallPrompt } from './components/InstallPrompt'
 import { Toaster } from './components/Toaster'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
   return (
-    <>
+    <ErrorBoundary>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/closet" replace />} />
@@ -26,7 +27,7 @@ function App() {
       </Routes>
       <Toaster />
       <InstallPrompt />
-    </>
+    </ErrorBoundary>
   )
 }
 

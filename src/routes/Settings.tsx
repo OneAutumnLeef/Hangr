@@ -1,6 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, Trash2, Shield, HardDrive, Github } from 'lucide-react'
+import {
+  Download,
+  Trash2,
+  Shield,
+  HardDrive,
+  Github,
+  Cpu,
+} from 'lucide-react'
 import { db } from '@/db/dexie'
 import {
   deleteAllData,
@@ -10,6 +17,7 @@ import {
   type StorageEstimate,
 } from '@/lib/dataExport'
 import { toast } from '@/lib/toast'
+import { isIOS, usePrefs } from '@/lib/preferences'
 
 export function Settings() {
   const itemCount = useLiveQuery(() => db.items.count())
@@ -18,6 +26,8 @@ export function Settings() {
   const [storage, setStorage] = useState<StorageEstimate | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const mlEnabled = usePrefs((s) => s.mlEnabled)
+  const setMlEnabled = usePrefs((s) => s.setMlEnabled)
 
   useEffect(() => {
     getStorageEstimate().then(setStorage)
@@ -81,6 +91,42 @@ export function Settings() {
             You can verify this by opening DevTools → Network.
           </p>
         </div>
+      </Section>
+
+      <Section icon={<Cpu size={16} />} title="On-device ML">
+        <button
+          type="button"
+          onClick={() => setMlEnabled(!mlEnabled)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-ink-800 border border-ink-700 active:scale-[0.99] transition"
+        >
+          <div className="text-left flex-1 min-w-0">
+            <div className="text-sm">Background removal & auto-detection</div>
+            <div className="mt-0.5 text-xs text-ink-500 leading-snug">
+              {isIOS
+                ? 'Off by default on iOS. Loading the models pushes memory close to Safari\'s limit and can crash the page.'
+                : 'Runs RMBG-1.4 + CLIP entirely in your browser. ~230MB total, downloaded once.'}
+            </div>
+          </div>
+          <span
+            className={
+              'shrink-0 inline-flex h-6 w-10 rounded-full p-0.5 transition ' +
+              (mlEnabled ? 'bg-accent' : 'bg-ink-700')
+            }
+          >
+            <span
+              className={
+                'h-5 w-5 rounded-full bg-ink-50 transition-transform ' +
+                (mlEnabled ? 'translate-x-4' : 'translate-x-0')
+              }
+            />
+          </span>
+        </button>
+        {isIOS && mlEnabled && (
+          <div className="mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            Heads up: on iOS, this can cause Safari to reload the page mid-capture
+            if your device is low on memory. If that happens, turn it back off.
+          </div>
+        )}
       </Section>
 
       <Section icon={<HardDrive size={16} />} title="Storage">
