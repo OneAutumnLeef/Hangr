@@ -1,4 +1,4 @@
-import { db, type Item, type ItemPhoto } from './dexie'
+import { db, type ArchivedReason, type Item, type ItemPhoto } from './dexie'
 import { makeId } from '@/lib/utils'
 
 /**
@@ -15,6 +15,9 @@ export interface CreateItemInput {
   purchasePriceMinor?: number
   purchasedAt?: number
   source?: 'manual' | 'gmail' | 'ledgr'
+  /** Pre-owned baseline. */
+  seedWearCount?: number
+  seedAsOf?: number
   photo?: {
     blob: Blob
     width: number
@@ -55,6 +58,8 @@ export async function createItem(input: CreateItemInput): Promise<Item> {
       purchasedAt: input.purchasedAt,
       source: input.source ?? 'manual',
       createdAt: now,
+      seedWearCount: input.seedWearCount,
+      seedAsOf: input.seedAsOf,
     }
     await db.items.add(item)
   })
@@ -78,12 +83,24 @@ export async function getItemPhoto(id: string | undefined) {
   return db.itemPhotos.get(id)
 }
 
-export async function archiveItem(id: string) {
-  await db.items.update(id, { archivedAt: Date.now() })
+export async function archiveItem(
+  id: string,
+  reason?: ArchivedReason,
+  note?: string,
+) {
+  await db.items.update(id, {
+    archivedAt: Date.now(),
+    archivedReason: reason,
+    archivedNote: note?.trim() || undefined,
+  })
 }
 
 export async function unarchiveItem(id: string) {
-  await db.items.update(id, { archivedAt: undefined })
+  await db.items.update(id, {
+    archivedAt: undefined,
+    archivedReason: undefined,
+    archivedNote: undefined,
+  })
 }
 
 export async function updateItem(id: string, patch: Partial<Item>) {

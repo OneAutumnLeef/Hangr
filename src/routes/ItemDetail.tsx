@@ -12,8 +12,11 @@ import {
   Check,
   CalendarPlus,
   Trash2,
+  History,
+  Plus,
+  X,
 } from 'lucide-react'
-import { db } from '@/db/dexie'
+import { db, type ArchivedReason } from '@/db/dexie'
 import {
   archiveItem,
   getItemPhoto,
@@ -21,12 +24,9 @@ import {
   unarchiveItem,
   updateItem,
 } from '@/db/items'
-import {
-  deleteWear,
-  listWearsForItem,
-  logWear,
-} from '@/db/wears'
+import { deleteWear, listWearsForItem, logWear } from '@/db/wears'
 import { ItemForm, type ItemFormValues } from '@/components/ItemForm'
+import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { processPhoto } from '@/lib/photo'
 import { removeBackground, type BgRemovalProgress } from '@/lib/bgRemoval'
 import { toast } from '@/lib/toast'
@@ -36,6 +36,18 @@ import {
   relativeDayLabel,
   shortDate,
 } from '@/lib/dates'
+
+const ARCHIVED_REASON_LABELS: Record<ArchivedReason, string> = {
+  donated: 'Donated',
+  sold: 'Sold',
+  gifted: 'Gave away',
+  lost: 'Lost',
+  damaged: 'Damaged',
+  replaced: 'Replaced',
+  outgrown: 'Outgrown',
+  unworn: 'Just don’t wear',
+  other: 'Other',
+}
 
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>()
@@ -65,6 +77,12 @@ export function ItemDetail() {
   const [replacing, setReplacing] = useState(false)
   const [replacingProgress, setReplacingProgress] =
     useState<BgRemovalProgress | null>(null)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  // Backdate inline picker
+  const [backdateOpen, setBackdateOpen] = useState(false)
+  const [backdateValue, setBackdateValue] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  )
 
   useEffect(() => {
     if (!photo?.blob) {
@@ -93,11 +111,14 @@ export function ItemDetail() {
 
   const today = startOfDay()
   const wornToday = wears?.some((w) => isSameDay(w.wornAt, today)) ?? false
-  const wearCount = wears?.length ?? 0
-  const lastWornAt = wears?.[0]?.wornAt
+  const realWearCount = wears?.length ?? 0
+  const seedWearCount = item.seedWearCount ?? 0
+  const totalWearCount = realWearCount + seedWearCount
+  const lastRealWornAt = wears?.[0]?.wornAt
+  const lastWornAt = lastRealWornAt ?? item.seedAsOf
   const cpw =
-    item.purchasePriceMinor != null && wearCount > 0
-      ? item.purchasePriceMinor / 100 / wearCount
+    item.purchasePriceMinor != null && totalWearCount > 0
+      ? item.purchasePriceMinor / 100 / totalWearCount
       : undefined
 
   async function handleSaveEdit(values: ItemFormValues) {
@@ -112,6 +133,8 @@ export function ItemDetail() {
         purchasePriceMinor:
           values.priceRupees != null ? values.priceRupees * 100 : undefined,
         purchasedAt: values.purchasedAt,
+        seedWearCount: values.seedWearCount,
+        seedAsOf: values.seedAsOf,
       })
       setEditing(false)
       toast.success('Item updated')
@@ -123,20 +146,33 @@ export function ItemDetail() {
     }
   }
 
-  async function handleArchiveToggle() {
+  async function handleArchiveConfirm(
+    reason: ArchivedReason | undefined,
+    note?: string,
+  ) {
     if (!item) return
     setBusy(true)
     try {
-      if (item.archivedAt) {
-        await unarchiveItem(item.id)
-        toast.success('Restored from archive')
-      } else {
-        await archiveItem(item.id)
-        toast.info('Archived')
-      }
+      await archiveItem(item.id, reason, note)
+      setArchiveOpen(false)
+      toast.info('Archived')
     } catch (err) {
       console.error(err)
-      setError('Could not update archive state.')
+      setError('Could not archive.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleUnarchive() {
+    if (!item) return
+    setBusy(true)
+    try {
+      await unarchiveItem(item.id)
+      toast.success('Restored from archive')
+    } catch (err) {
+      console.error(err)
+      setError('Could not restore.')
     } finally {
       setBusy(false)
     }
@@ -204,6 +240,37 @@ export function ItemDetail() {
     }
   }
 
+  async function handleBackdateSubmit() {
+    if (!item || !backdateValue) return
+    const ts = startOfDay(new Date(backdateValue).getTime())
+    if (Number.isNaN(ts)) return
+    if (ts > today) {
+      toast.error('Pick a date in the past')
+      return
+    }
+    setBusy(true)
+    try {
+      // Avoid duplicates on the chosen day
+      const existing = wears?.find((w) => isSameDay(w.wornAt, ts))
+      if (existing) {
+        toast.info('Already logged for that day')
+      } else {
+        await logWear({
+          itemId: item.id,
+          wornAt: ts,
+          source: 'backdated',
+        })
+        toast.success(`Logged for ${shortDate(ts)}`)
+      }
+      setBackdateOpen(false)
+    } catch (err) {
+      console.error(err)
+      setError('Could not log past wear.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="max-w-md mx-auto pb-8">
       <header className="px-4 pt-12 pb-4 flex items-center justify-between">
@@ -224,19 +291,27 @@ export function ItemDetail() {
               <Pencil size={18} />
             </button>
           )}
-          <button
-            onClick={handleArchiveToggle}
-            disabled={busy}
-            className="p-2 rounded-lg text-ink-300 hover:text-ink-50 disabled:opacity-50"
-            aria-label={item.archivedAt ? 'Unarchive' : 'Archive'}
-            title={item.archivedAt ? 'Unarchive' : 'Archive'}
-          >
-            {item.archivedAt ? (
+          {item.archivedAt ? (
+            <button
+              onClick={handleUnarchive}
+              disabled={busy}
+              className="p-2 rounded-lg text-ink-300 hover:text-ink-50 disabled:opacity-50"
+              aria-label="Unarchive"
+              title="Unarchive"
+            >
               <ArchiveRestore size={18} />
-            ) : (
+            </button>
+          ) : (
+            <button
+              onClick={() => setArchiveOpen(true)}
+              disabled={busy}
+              className="p-2 rounded-lg text-ink-300 hover:text-ink-50 disabled:opacity-50"
+              aria-label="Archive"
+              title="Archive"
+            >
               <Archive size={18} />
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </header>
 
@@ -247,9 +322,20 @@ export function ItemDetail() {
       )}
 
       {item.archivedAt && (
-        <div className="mx-4 mb-4 px-3 py-2 rounded-xl bg-ink-800 border border-ink-700 text-ink-300 text-xs flex items-center gap-2">
-          <Archive size={14} />
-          Archived on {new Date(item.archivedAt).toLocaleDateString('en-IN')}
+        <div className="mx-4 mb-4 px-3 py-2 rounded-xl bg-ink-800 border border-ink-700 text-ink-300 text-xs">
+          <div className="flex items-center gap-2">
+            <Archive size={14} />
+            <span>
+              Archived{' '}
+              {item.archivedReason
+                ? `· ${ARCHIVED_REASON_LABELS[item.archivedReason]}`
+                : ''}{' '}
+              · {new Date(item.archivedAt).toLocaleDateString('en-IN')}
+            </span>
+          </div>
+          {item.archivedNote && (
+            <div className="mt-1 ml-6 text-ink-400">{item.archivedNote}</div>
+          )}
         </div>
       )}
 
@@ -323,6 +409,8 @@ export function ItemDetail() {
                     ? item.purchasePriceMinor / 100
                     : undefined,
                 purchasedAt: item.purchasedAt,
+                seedWearCount: item.seedWearCount,
+                seedAsOf: item.seedAsOf,
               }}
             />
           </div>
@@ -359,13 +447,69 @@ export function ItemDetail() {
               )}
             </button>
 
+            {/* Backdate a wear */}
+            <div className="mt-2">
+              {!backdateOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBackdateOpen(true)
+                    setBackdateValue(new Date().toISOString().slice(0, 10))
+                  }}
+                  disabled={busy || !!item.archivedAt}
+                  className="text-xs text-ink-400 hover:text-ink-100 inline-flex items-center gap-1 disabled:opacity-50"
+                >
+                  <Plus size={12} />
+                  Log a past wear
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="date"
+                    value={backdateValue}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setBackdateValue(e.target.value)}
+                    className="form-input flex-1 py-1.5"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBackdateSubmit}
+                    disabled={busy || !backdateValue}
+                    className="px-3 py-1.5 rounded-full bg-accent text-ink-950 text-xs font-medium disabled:opacity-50"
+                  >
+                    Log it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBackdateOpen(false)}
+                    className="p-1.5 rounded-full text-ink-400 hover:text-ink-100"
+                    aria-label="Cancel"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Wear stats */}
             <div className="mt-6 grid grid-cols-3 gap-3 text-center">
-              <Stat label="Wears" value={String(wearCount)} />
+              <Stat
+                label="Wears"
+                value={String(totalWearCount)}
+                hint={
+                  seedWearCount > 0
+                    ? `${realWearCount} logged · ${seedWearCount} prior`
+                    : undefined
+                }
+              />
               <Stat
                 label="Last worn"
                 value={
-                  lastWornAt ? relativeDayLabel(lastWornAt) : '—'
+                  lastRealWornAt
+                    ? relativeDayLabel(lastRealWornAt)
+                    : item.seedAsOf
+                      ? `~${relativeDayLabel(item.seedAsOf)}`
+                      : '—'
                 }
               />
               <Stat
@@ -377,6 +521,31 @@ export function ItemDetail() {
                 }
               />
             </div>
+
+            {/* Pre-owned badge */}
+            {seedWearCount > 0 && (
+              <div className="mt-4 px-3 py-2.5 rounded-xl bg-ink-800/60 border border-ink-800 text-xs text-ink-300 flex items-center gap-2">
+                <History size={14} className="text-accent" />
+                <span>
+                  Pre-Hangr baseline:{' '}
+                  <span className="text-ink-100 font-medium">
+                    ~{seedWearCount} wears
+                  </span>
+                  {item.seedAsOf && (
+                    <>
+                      {' '}
+                      since{' '}
+                      <span className="text-ink-100">
+                        {new Date(item.seedAsOf).toLocaleDateString('en-IN', {
+                          dateStyle: 'medium',
+                        })}
+                      </span>
+                    </>
+                  )}
+                  . Edit to adjust.
+                </span>
+              </div>
+            )}
 
             {/* Item metadata */}
             <dl className="mt-6 space-y-3 text-sm">
@@ -425,6 +594,11 @@ export function ItemDetail() {
                       <div>
                         <div className="text-ink-100">
                           {relativeDayLabel(w.wornAt)}
+                          {w.source === 'backdated' && (
+                            <span className="ml-2 text-[10px] text-ink-500">
+                              backdated
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-ink-500">
                           {shortDate(w.wornAt)}
@@ -450,6 +624,14 @@ export function ItemDetail() {
           </>
         )}
       </div>
+
+      <ArchiveDialog
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        onConfirm={handleArchiveConfirm}
+        itemName={item.name}
+        busy={busy}
+      />
     </div>
   )
 }
@@ -463,11 +645,22 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: string
+  hint?: string
+}) {
   return (
     <div className="rounded-2xl bg-ink-800 border border-ink-800 px-3 py-3">
       <div className="text-xs text-ink-400">{label}</div>
       <div className="mt-0.5 text-base font-medium truncate">{value}</div>
+      {hint && (
+        <div className="mt-0.5 text-[10px] text-ink-500 truncate">{hint}</div>
+      )}
     </div>
   )
 }

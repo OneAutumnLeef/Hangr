@@ -97,16 +97,31 @@ export async function removeBackground(
 
     const { pixel_values } = await processor(image)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const output = (await model({ input: pixel_values })) as any
+    const rawOutput = (await model({ input: pixel_values })) as any
 
-    // RMBG outputs a single-channel mask. Some builds expose it as `output`,
-    // others return a tensor directly.
-    const tensor = output.output ?? output[0] ?? output
-    const maskTensor = Array.isArray(tensor) ? tensor[0] : tensor
-    const maskRaw = await RawImage.fromTensor(maskTensor.mul(255).to('uint8'))
+    // Different transformers.js versions wrap the result differently.
+    // Try every shape we've seen in the wild before giving up.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tensor: any =
+      rawOutput?.output ??
+      rawOutput?.logits ??
+      rawOutput?.[0] ??
+      rawOutput
+    // Drop the batch dim
+    if (typeof tensor?.[0] === 'object' && tensor?.[0] !== null) {
+      tensor = tensor[0]
+    }
+    if (!tensor?.mul) {
+      throw new Error(
+        `RMBG output has unexpected shape (${typeof tensor}); transformers.js may have changed.`,
+      )
+    }
+
+    // Convert mask to a uint8 RawImage and resize to the input dimensions.
+    const maskRaw = RawImage.fromTensor(tensor.mul(255).to('uint8'))
     const mask = await maskRaw.resize(image.width, image.height)
 
-    // Composite: copy original RGB, set alpha from mask grayscale.
+    // Composite original RGB + mask alpha.
     const canvas = document.createElement('canvas')
     canvas.width = image.width
     canvas.height = image.height
@@ -118,10 +133,27 @@ export async function removeBackground(
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
     const maskData = mask.data as Uint8Array
-    for (let i = 0; i < imageData.data.length / 4; i++) {
-      // Mask is grayscale (single channel). Use it as alpha.
-      const alpha = maskData[i] ?? 0
-      imageData.data[i * 4 + 3] = alpha
+
+    // The resized mask might be 1-channel (grayscale) or 4-channel (RGBA from
+    // a canvas-based resize). Compute bytes-per-pixel and read the first
+    // channel either way.
+    const totalPixels = canvas.width * canvas.height
+    const bytesPerMaskPixel = Math.max(
+      1,
+      Math.round(maskData.length / Math.max(1, totalPixels)),
+    )
+    if (
+      maskData.length !== totalPixels * bytesPerMaskPixel ||
+      bytesPerMaskPixel > 4
+    ) {
+      console.warn(
+        `[Hangr bg removal] mask buffer (${maskData.length}B) doesn't divide evenly into ${totalPixels} pixels; cutout may be misaligned.`,
+      )
+    }
+
+    for (let p = 0; p < totalPixels; p++) {
+      const alpha = maskData[p * bytesPerMaskPixel] ?? 0
+      imageData.data[p * 4 + 3] = alpha
     }
     ctx.putImageData(imageData, 0, 0)
 

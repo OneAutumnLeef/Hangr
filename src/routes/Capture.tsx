@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera as CameraIcon, ImagePlus, Sparkles, Loader2 } from 'lucide-react'
+import {
+  Camera as CameraIcon,
+  ImagePlus,
+  Sparkles,
+  Loader2,
+  Wand2,
+} from 'lucide-react'
 import { processPhoto, type ProcessedPhoto } from '@/lib/photo'
 import { removeBackground, type BgRemovalProgress } from '@/lib/bgRemoval'
+import {
+  detectCategory,
+  detectDominantColor,
+  ensureClassifierLoaded,
+} from '@/lib/detection'
 import { ItemForm, type ItemFormValues } from '@/components/ItemForm'
 import { createItem } from '@/db/items'
 import { toast } from '@/lib/toast'
@@ -12,6 +23,14 @@ interface VariantState {
   original: ProcessedPhoto
   cutout?: ProcessedPhoto
   cutoutFailed?: boolean
+  cutoutError?: string
+}
+
+interface DetectedSuggestions {
+  category?: string
+  color?: string
+  /** Display-only — the hex behind the named color, for the swatch chip. */
+  colorHex?: string
 }
 
 export function Capture() {
@@ -19,12 +38,16 @@ export function Capture() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [variants, setVariants] = useState<VariantState | null>(null)
-  const [showVariant, setShowVariant] = useState<'original' | 'cutout'>('cutout')
+  const [showVariant, setShowVariant] = useState<'original' | 'cutout'>(
+    'cutout',
+  )
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [removalProgress, setRemovalProgress] =
     useState<BgRemovalProgress | null>(null)
+  const [detecting, setDetecting] = useState(false)
+  const [detected, setDetected] = useState<DetectedSuggestions | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Cleanup any object URLs when unmounting
@@ -44,6 +67,8 @@ export function Capture() {
     setError(null)
     setRemovalProgress(null)
     setRemoving(false)
+    setDetected(null)
+    setDetecting(false)
   }
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
@@ -56,8 +81,7 @@ export function Capture() {
       const original = await processPhoto(file)
       setVariants({ original })
       setBusy(false)
-      // Kick off bg removal in the background
-      runBgRemoval(original)
+      void runPipeline(original)
     } catch (err) {
       console.error(err)
       setError('Could not read that image. Try another.')
@@ -65,30 +89,67 @@ export function Capture() {
     }
   }
 
-  async function runBgRemoval(original: ProcessedPhoto) {
+  async function runPipeline(original: ProcessedPhoto) {
+    // Start CLIP model preload in parallel with bg removal — both will be
+    // cached after first run.
+    const classifierPreload = ensureClassifierLoaded().catch((err) => {
+      console.warn('Classifier preload failed:', err)
+      return null
+    })
+
     setRemoving(true)
+    let cutout: ProcessedPhoto | undefined
     try {
-      const { blob, width, height } = await removeBackground(
-        original.blob,
-        (p) => setRemovalProgress(p),
+      const result = await removeBackground(original.blob, (p) =>
+        setRemovalProgress(p),
       )
-      const url = URL.createObjectURL(blob)
+      const url = URL.createObjectURL(result.blob)
+      cutout = {
+        blob: result.blob,
+        width: result.width,
+        height: result.height,
+        url,
+      }
       setVariants((prev) =>
-        prev
-          ? {
-              ...prev,
-              cutout: { blob, width, height, url },
-            }
-          : prev,
+        prev ? { ...prev, cutout: cutout! } : prev,
       )
       setShowVariant('cutout')
     } catch (err) {
       console.error('Background removal failed:', err)
-      setVariants((prev) => (prev ? { ...prev, cutoutFailed: true } : prev))
+      const message = err instanceof Error ? err.message : String(err)
+      setVariants((prev) =>
+        prev
+          ? { ...prev, cutoutFailed: true, cutoutError: message }
+          : prev,
+      )
       setShowVariant('original')
     } finally {
       setRemoving(false)
       setRemovalProgress(null)
+    }
+
+    // Detection runs on cutout if available, original otherwise
+    setDetecting(true)
+    try {
+      const sourceBlob = cutout?.blob ?? original.blob
+      await classifierPreload
+      const [colorResult, categoryResult] = await Promise.all([
+        detectDominantColor(sourceBlob).catch((e) => {
+          console.warn('Color detection failed:', e)
+          return undefined
+        }),
+        detectCategory(sourceBlob).catch((e) => {
+          console.warn('Category detection failed:', e)
+          return undefined
+        }),
+      ])
+      setDetected({
+        category: categoryResult?.label,
+        color: colorResult?.name,
+        colorHex: colorResult?.hex,
+      })
+    } finally {
+      setDetecting(false)
     }
   }
 
@@ -111,6 +172,8 @@ export function Capture() {
         purchasePriceMinor:
           values.priceRupees != null ? values.priceRupees * 100 : undefined,
         purchasedAt: values.purchasedAt,
+        seedWearCount: values.seedWearCount,
+        seedAsOf: values.seedAsOf,
         photo: {
           blob: photoSource.blob,
           width: photoSource.width,
@@ -160,7 +223,7 @@ export function Capture() {
         <div className="space-y-3">
           <p className="text-ink-400 text-sm leading-relaxed mb-2">
             Photograph an item or pick one from your gallery. Photos and the
-            background-removal model run on this device — nothing is uploaded.
+            ML models run on this device — nothing is uploaded.
           </p>
 
           <button
@@ -270,14 +333,54 @@ export function Capture() {
                 Original
               </button>
             </div>
-            {variants.cutoutFailed && (
-              <div className="text-xs text-ink-400">
-                Cutout failed · using original
-              </div>
-            )}
           </div>
 
-          <ItemForm onSubmit={handleSave} disabled={saving} />
+          {/* Surface bg removal error inline so users can debug without devtools */}
+          {variants.cutoutFailed && (
+            <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+              <div className="font-medium">
+                Cutout couldn't run — saving original instead.
+              </div>
+              {variants.cutoutError && (
+                <div className="mt-1 text-amber-300/80 break-words">
+                  {variants.cutoutError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auto-detection banner */}
+          {(detecting || detected) && (
+            <div className="flex items-center gap-2 text-xs text-ink-300">
+              {detecting ? (
+                <>
+                  <Loader2 size={12} className="animate-spin text-accent" />
+                  <span>Auto-detecting category & color…</span>
+                </>
+              ) : detected && (detected.category || detected.color) ? (
+                <>
+                  <Wand2 size={12} className="text-accent" />
+                  <span>
+                    Auto-filled below — edit if wrong.
+                  </span>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          <ItemForm
+            onSubmit={handleSave}
+            disabled={saving}
+            detected={
+              detected
+                ? {
+                    category: detected.category,
+                    color: detected.color,
+                    colorHex: detected.colorHex,
+                  }
+                : undefined
+            }
+          />
         </div>
       )}
     </div>

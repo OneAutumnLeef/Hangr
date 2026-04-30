@@ -8,27 +8,41 @@ import { addDays, daysBetween, startOfDay } from '@/lib/dates'
  * For personal-scale wardrobes (a few hundred items, a few thousand wears)
  * this is fine to recompute on every change. If we ever ship to power users
  * with much larger histories we can memoize per-day or shift to incremental.
+ *
+ * `wearCount` and friends always include the item's `seedWearCount` (the
+ * pre-Hangr baseline a user enters when adding an item they've already
+ * been wearing). This way "Most worn" reflects reality, not just tracked time.
  */
 
 export interface ClosetStats {
   totalItems: number
   totalArchived: number
   totalSpentMinor: number
+  /** Total of (logged wears) + (sum of seedWearCount across active items). */
   totalWears: number
   avgCostPerWear?: number
   itemsNeverWorn: number
   itemsDormant30: number
   itemsDormant90: number
-  /** Sum of cost-per-wear-eligible items only (i.e., have price + at least 1 wear). */
+  /** Sum of cost-per-wear-eligible items only (have price + at least 1 wear). */
   pricedSpentMinor: number
 }
 
 export interface ItemAnalytic {
   item: Item
+  /** Logged wears + seedWearCount. */
   wearCount: number
+  /** Logged wears only. */
+  realWearCount: number
+  /** Pre-Hangr seed (mirror of item.seedWearCount, or 0). */
+  seedWearCount: number
+  /**
+   * Most recent observed wear timestamp. Logged wears beat seed; if no logged
+   * wear, falls back to `seedAsOf`.
+   */
   lastWornAt?: number
   daysSinceLastWear?: number
-  /** In whole rupees. */
+  /** Whole rupees per total wear. Uses combined wearCount. */
   costPerWear?: number
 }
 
@@ -66,16 +80,24 @@ export async function loadAllAnalytics(): Promise<AnalyticsBundle> {
   const items: ItemAnalytic[] = activeItems.map((item) => {
     const wears = wearsByItem.get(item.id) ?? []
     const sorted = [...wears].sort((a, b) => b.wornAt - a.wornAt)
-    const lastWornAt = sorted[0]?.wornAt
+    const realLastWornAt = sorted[0]?.wornAt
+    // For pre-owned items, seedAsOf acts as the last-known-touch when there
+    // are no logged wears yet — otherwise a freshly added pre-owned item would
+    // immediately look "dormant 2 years."
+    const lastWornAt = realLastWornAt ?? item.seedAsOf
+    const seed = item.seedWearCount ?? 0
+    const totalWearCount = wears.length + seed
     return {
       item,
-      wearCount: wears.length,
+      wearCount: totalWearCount,
+      realWearCount: wears.length,
+      seedWearCount: seed,
       lastWornAt,
       daysSinceLastWear:
         lastWornAt != null ? daysBetween(lastWornAt, today) : undefined,
       costPerWear:
-        item.purchasePriceMinor != null && wears.length > 0
-          ? item.purchasePriceMinor / 100 / wears.length
+        item.purchasePriceMinor != null && totalWearCount > 0
+          ? item.purchasePriceMinor / 100 / totalWearCount
           : undefined,
     }
   })
@@ -91,29 +113,30 @@ export async function loadAllAnalytics(): Promise<AnalyticsBundle> {
         : sum,
     0,
   )
-  const totalWears = allWears.length
+  const totalWearsAll = items.reduce((s, i) => s + i.wearCount, 0)
   const avgCpw =
-    totalWears > 0 && pricedSpent > 0 ? pricedSpent / 100 / totalWears : undefined
+    totalWearsAll > 0 && pricedSpent > 0
+      ? pricedSpent / 100 / totalWearsAll
+      : undefined
 
   const stats: ClosetStats = {
     totalItems: items.length,
     totalArchived: allItems.length - activeItems.length,
     totalSpentMinor: totalSpent,
-    totalWears,
+    totalWears: totalWearsAll,
     avgCostPerWear: avgCpw,
     itemsNeverWorn: items.filter((i) => i.wearCount === 0).length,
     itemsDormant30: items.filter(
-      (i) =>
-        i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= 30,
+      (i) => i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= 30,
     ).length,
     itemsDormant90: items.filter(
-      (i) =>
-        i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= 90,
+      (i) => i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= 90,
     ).length,
     pricedSpentMinor: pricedSpent,
   }
 
   // Weekly wear counts for the last 12 weeks (Monday-anchored).
+  // Note: this only tracks LOGGED wears — seed wears aren't on the timeline.
   const todayDate = new Date(today)
   const jsDow = todayDate.getDay() // 0 (Sun) .. 6 (Sat)
   const dayOfWeek = jsDow === 0 ? 6 : jsDow - 1 // 0 = Monday
@@ -168,11 +191,9 @@ export function worstCostPerWear(items: ItemAnalytic[], n = 5) {
 export function dormantItems(items: ItemAnalytic[], minDays = 30) {
   return items
     .filter(
-      (i) =>
-        i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= minDays,
+      (i) => i.wearCount === 0 || (i.daysSinceLastWear ?? 0) >= minDays,
     )
     .sort((a, b) => {
-      // Never-worn first, then longest-dormant
       if (a.wearCount === 0 && b.wearCount !== 0) return -1
       if (b.wearCount === 0 && a.wearCount !== 0) return 1
       const aD = a.daysSinceLastWear ?? Infinity
