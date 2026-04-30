@@ -383,7 +383,16 @@ export function Settings() {
       </div>
 
       <div className="mt-3 text-[11px] text-tertiary text-center">
-        Made with care · all data stays on your device
+        Built by{' '}
+        <a
+          href="https://derajyojith.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline"
+        >
+          Deraj
+        </a>{' '}
+        · all data stays on your device
       </div>
 
       {confirmDelete && (
