@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Download, Trash2, ChevronDown, Sparkles, Image as ImageIcon, Search } from 'lucide-react'
+import { Download, Trash2, ChevronDown, Sparkles, Image as ImageIcon, Search, Gift } from 'lucide-react'
 import { db } from '@/db/dexie'
 import {
   deleteAllData,
@@ -21,6 +21,7 @@ import {
   fillMissingPhotos,
   seedExampleData,
 } from '@/lib/seedData'
+import { computeWrapped, renderWrappedPng } from '@/lib/wrapped'
 
 export function Settings() {
   const itemCount = useLiveQuery(() => db.items.count())
@@ -136,6 +137,35 @@ export function Settings() {
     }
   }
 
+  // Build the year-in-clothes recap PNG and trigger a download. Renders
+  // entirely client-side; nothing leaves the device unless the user shares it.
+  async function handleWrapped() {
+    setBusy(true)
+    toast.info('Generating recap…')
+    try {
+      const year = new Date().getFullYear()
+      const stats = await computeWrapped(year)
+      if (stats.totalWears === 0) {
+        toast.info('Nothing to recap yet — log a few wears first')
+        return
+      }
+      const blob = await renderWrappedPng(stats)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `hangr-${year}-wrapped.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(`Saved ${year} recap`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Recap failed — check console')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const isEmpty = (itemCount ?? 0) === 0
   const usagePct =
@@ -220,6 +250,21 @@ export function Settings() {
             </div>
           </div>
         </Row>
+
+        {/* Year-in-clothes Wrapped — generates a shareable PNG */}
+        <RowButton onClick={handleWrapped} disabled={busy || isEmpty}>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] text-ink-50">Year in clothes</div>
+            <div className="mt-0.5 text-[12px] text-tertiary">
+              Save a {new Date().getFullYear()} recap as a shareable image.
+            </div>
+          </div>
+          <Gift
+            size={18}
+            strokeWidth={1.75}
+            className="text-accent shrink-0"
+          />
+        </RowButton>
 
         {/* Export */}
         <RowButton onClick={handleExport} disabled={busy || isEmpty}>
