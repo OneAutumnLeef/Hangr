@@ -53,6 +53,10 @@ export default defineConfig({
         // SPA routing — every unknown URL falls back to index.html.
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
+        // Activate new builds immediately instead of waiting for all tabs to close.
+        // Critical on iOS Safari, where cached SWs can serve stale JS for days.
+        skipWaiting: true,
+        clientsClaim: true,
       },
       devOptions: {
         enabled: true,
@@ -64,6 +68,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  // Stamp the build time so we can verify which version is actually loaded.
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   // transformers.js / onnxruntime-web load wasm files at runtime; pre-bundling them
   // into Vite's optimized deps causes init failures. Exclude so they're loaded as-is.

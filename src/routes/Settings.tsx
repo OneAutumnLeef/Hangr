@@ -129,7 +129,10 @@ export function Settings() {
 
       <Section icon={<Github size={16} />} title="About">
         <div className="text-sm text-ink-300 leading-relaxed">
-          Hangr v0.1 — a privacy-first wardrobe tracker. Built by Deraj.
+          Hangr v0.5 — a privacy-first wardrobe tracker. Built by Deraj.
+        </div>
+        <div className="mt-3 text-[10px] text-ink-500 font-mono break-all">
+          build: {__BUILD_TIME__}
         </div>
       </Section>
 
