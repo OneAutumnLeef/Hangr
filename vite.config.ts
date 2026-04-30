@@ -3,8 +3,14 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'node:path'
 
+// Hangr is served from the `/Hangr/` subpath under derajyojith.dev. Every
+// asset URL, the React Router basename, the PWA scope, and the workbox SPA
+// fallback all need to know that — change them together via this constant.
+const BASE = '/Hangr/'
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: BASE,
   plugins: [
     react(),
     VitePWA({
@@ -19,8 +25,8 @@ export default defineConfig({
         background_color: '#0a0a0a',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: BASE,
+        scope: BASE,
         icons: [
           {
             src: 'pwa-64x64.png',
@@ -50,8 +56,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         // ML model files (BiRefNet, CLIP) are large — bump cache budget so they cache offline.
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
-        // SPA routing — every unknown URL falls back to index.html.
-        navigateFallback: 'index.html',
+        // SPA routing — unknown URLs under /Hangr/ fall back to index.html.
+        // Allowlist limits the fallback to our subpath so a sibling app under
+        // the same domain (e.g. derajyojith.dev/anything-else) isn't hijacked.
+        navigateFallback: `${BASE}index.html`,
+        navigateFallbackAllowlist: [new RegExp(`^${BASE.replace(/\//g, '\\/')}`)],
         cleanupOutdatedCaches: true,
         // Activate new builds immediately instead of waiting for all tabs to close.
         // Critical on iOS Safari, where cached SWs can serve stale JS for days.

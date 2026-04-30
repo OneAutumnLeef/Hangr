@@ -1,0 +1,7 @@
+# SPA fallback for client-side routes. Cloudflare Pages and Netlify both
+# read this file at deploy root and rewrite unmatched paths to index.html
+# with a 200 (so React Router can pick up the URL on a hard refresh).
+#
+# `/*` covers everything inside this deployment. Vite's `base: '/Hangr/'`
+# already prefixes asset URLs, so this rule only needs to catch route paths.
+/*  /index.html  200

@@ -21,10 +21,15 @@ const queryClient = new QueryClient({
   },
 })
 
+// Subpath-aware routing — when deployed at derajyojith.dev/Hangr/, BASE_URL
+// is '/Hangr/' (set in vite.config.ts) and React Router needs the same
+// basename minus the trailing slash so client routes resolve correctly.
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '')
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={ROUTER_BASENAME}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>
