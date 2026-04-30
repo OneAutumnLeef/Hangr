@@ -12,13 +12,21 @@ import { AutoModel, AutoProcessor, RawImage, env } from '@huggingface/transforme
 // Use the Hugging Face CDN for model weights. Models are then cached by
 // transformers.js itself (IndexedDB / Cache API) — second run is instant.
 env.allowLocalModels = false
-// Encourage WebGPU when available (transformers.js v3 falls back to WASM otherwise).
-// `env.backends.onnx.wasm` is typed as possibly undefined; guard before mutating.
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.proxy = false
 }
 
 const MODEL_ID = 'briaai/RMBG-1.4'
+
+/**
+ * iOS Safari (incl. iPhone, iPad) does not enable WebGPU by default.
+ * transformers.js's WebGPU→WASM fallback isn't always graceful, so we
+ * explicitly choose WASM on environments without `navigator.gpu`.
+ */
+function preferredDevice(): 'webgpu' | 'wasm' {
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator) return 'webgpu'
+  return 'wasm'
+}
 
 // Loose types — transformers.js v3 still has rough typings, easier to keep flexible.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,13 +58,16 @@ export async function ensureModelLoaded(
         })
       }
     }
+    const device = preferredDevice()
     const model = await AutoModel.from_pretrained(MODEL_ID, {
       // RMBG-1.4 has a custom architecture; transformers.js will use the included
       // ONNX file directly.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       config: { model_type: 'custom' } as any,
+      device,
       progress_callback,
-    })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
     const processor = await AutoProcessor.from_pretrained(MODEL_ID, {
       // The model card spec for the image processor.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -48,6 +48,7 @@ export function Capture() {
     useState<BgRemovalProgress | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [detected, setDetected] = useState<DetectedSuggestions | null>(null)
+  const [detectionError, setDetectionError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Cleanup any object URLs when unmounting
@@ -69,6 +70,7 @@ export function Capture() {
     setRemoving(false)
     setDetected(null)
     setDetecting(false)
+    setDetectionError(null)
   }
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
@@ -130,9 +132,11 @@ export function Capture() {
 
     // Detection runs on cutout if available, original otherwise
     setDetecting(true)
+    setDetectionError(null)
     try {
       const sourceBlob = cutout?.blob ?? original.blob
       await classifierPreload
+      let categoryErr: unknown
       const [colorResult, categoryResult] = await Promise.all([
         detectDominantColor(sourceBlob).catch((e) => {
           console.warn('Color detection failed:', e)
@@ -140,6 +144,7 @@ export function Capture() {
         }),
         detectCategory(sourceBlob).catch((e) => {
           console.warn('Category detection failed:', e)
+          categoryErr = e
           return undefined
         }),
       ])
@@ -148,6 +153,14 @@ export function Capture() {
         color: colorResult?.name,
         colorHex: colorResult?.hex,
       })
+      // Surface a category-detection failure (color is reliable; category uses CLIP).
+      if (!categoryResult && categoryErr) {
+        const msg =
+          categoryErr instanceof Error
+            ? categoryErr.message
+            : String(categoryErr)
+        setDetectionError(msg)
+      }
     } finally {
       setDetecting(false)
     }
@@ -360,11 +373,21 @@ export function Capture() {
               ) : detected && (detected.category || detected.color) ? (
                 <>
                   <Wand2 size={12} className="text-accent" />
-                  <span>
-                    Auto-filled below — edit if wrong.
-                  </span>
+                  <span>Auto-filled below — edit if wrong.</span>
                 </>
               ) : null}
+            </div>
+          )}
+
+          {/* Detection error (e.g. CLIP failed to load on iOS) */}
+          {detectionError && !detecting && (
+            <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+              <div className="font-medium">
+                Auto-detection couldn't run.
+              </div>
+              <div className="mt-1 text-amber-300/80 break-words">
+                {detectionError}
+              </div>
             </div>
           )}
 

@@ -13,6 +13,15 @@
 import { pipeline } from '@huggingface/transformers'
 import { loadImage } from './photo'
 
+/**
+ * iOS Safari doesn't enable WebGPU by default — and transformers.js's
+ * WebGPU→WASM fallback isn't always graceful. Pick the right backend up front.
+ */
+function preferredDevice(): 'webgpu' | 'wasm' {
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator) return 'webgpu'
+  return 'wasm'
+}
+
 // ─── Color detection (no ML) ────────────────────────────────────────────────
 
 export interface DetectedColor {
@@ -207,10 +216,14 @@ export async function ensureClassifierLoaded(
   onProgress?: (p: CategoryDetectionProgress) => void,
 ) {
   if (classifierPromise) return classifierPromise
+  const device = preferredDevice()
   classifierPromise = pipeline(
     'zero-shot-image-classification',
     'Xenova/clip-vit-base-patch32',
     {
+      device,
+      // q8 quantized weights are smaller (~80MB) and run well on iOS WASM.
+      dtype: device === 'wasm' ? 'q8' : 'fp32',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       progress_callback: (data: any) => {
         if (data?.status === 'progress' && onProgress) {
@@ -220,7 +233,8 @@ export async function ensureClassifierLoaded(
           })
         }
       },
-    },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as Promise<any>
   return classifierPromise
