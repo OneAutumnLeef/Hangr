@@ -49,7 +49,7 @@ are better for local data), styled-components (Tailwind is the choice).
 ```
 Hangr/
 ├── public/
-│   └── icon.svg                 # Source for all PWA icons (generated via npm run generate-pwa-assets)
+│   └── icon.png                 # Source for all PWA icons (generated via npm run generate-pwa-assets)
 ├── src/
 │   ├── components/
 │   │   ├── ArchiveDialog.tsx    # Reason picker when archiving an item
@@ -217,7 +217,7 @@ poke `db.items` directly from components.
 
 ```bash
 npm install
-npm run generate-pwa-assets       # Once after icon.svg changes
+npm run generate-pwa-assets       # Once after icon.png changes
 npm run dev                       # http://localhost:5173 (also LAN-exposed)
 npm run build                     # tsc -b && vite build — must pass before pushing
 npm run preview                   # Preview production build locally

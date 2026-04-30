@@ -32,7 +32,7 @@ All data stays on your device. No cloud, no telemetry, no account.
 npm install
 
 # One-time: generates pwa-192x192.png, pwa-512x512.png, maskable, apple-touch, favicon
-# from public/icon.svg
+# from public/icon.png
 npm run generate-pwa-assets
 
 # Dev server (also exposed on LAN so you can open it on your phone)
@@ -76,7 +76,7 @@ Cloud sync, if ever added, will be opt-in and end-to-end encrypted. The default 
 ```
 Hangr/
 ├── public/
-│   └── icon.svg                 # master icon — generates all PWA sizes
+│   └── icon.png                 # master icon — generates all PWA sizes
 ├── src/
 │   ├── components/
 │   │   ├── CategoryFilter.tsx
