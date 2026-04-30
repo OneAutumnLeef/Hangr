@@ -52,21 +52,17 @@ function safeStringify(v: unknown): string {
   }
 }
 
-// Drop Blobs, Files, large arrays, etc. — we don't want to spam the buffer.
+// Drop Blobs, Files, large typed arrays, etc. — we don't want to spam the buffer.
 function replacer(_key: string, value: unknown) {
   if (value instanceof Blob) return `[Blob ${value.size} bytes ${value.type}]`
   if (value instanceof ArrayBuffer)
     return `[ArrayBuffer ${value.byteLength} bytes]`
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    'constructor' in value &&
-    (value.constructor === Uint8Array ||
-      value.constructor === Float32Array ||
-      value.constructor === Int32Array)
-  ) {
-    return `[${(value.constructor as { name: string }).name} ${(value as { length: number }).length}]`
-  }
+  if (value instanceof Uint8Array)
+    return `[Uint8Array ${value.length}]`
+  if (value instanceof Float32Array)
+    return `[Float32Array ${value.length}]`
+  if (value instanceof Int32Array)
+    return `[Int32Array ${value.length}]`
   return value
 }
 
