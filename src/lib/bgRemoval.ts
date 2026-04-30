@@ -8,6 +8,7 @@
  */
 
 import { AutoModel, AutoProcessor, RawImage, env } from '@huggingface/transformers'
+import { isIOS } from './preferences'
 
 // Use the Hugging Face CDN for model weights. Models are then cached by
 // transformers.js itself (IndexedDB / Cache API) — second run is instant.
@@ -19,11 +20,13 @@ if (env.backends?.onnx?.wasm) {
 const MODEL_ID = 'briaai/RMBG-1.4'
 
 /**
- * iOS Safari (incl. iPhone, iPad) does not enable WebGPU by default.
- * transformers.js's WebGPU→WASM fallback isn't always graceful, so we
- * explicitly choose WASM on environments without `navigator.gpu`.
+ * iOS Safari 18+ exposes `navigator.gpu` (WebGPU support landed in 17/18) but
+ * its WebGPU implementation is still immature: RMBG-1.4 inference reliably
+ * crashes the page below the JS layer (no error is throwable, the tab silently
+ * reloads). Force WASM on iOS until this stabilizes.
  */
 function preferredDevice(): 'webgpu' | 'wasm' {
+  if (isIOS) return 'wasm'
   if (typeof navigator !== 'undefined' && 'gpu' in navigator) return 'webgpu'
   return 'wasm'
 }

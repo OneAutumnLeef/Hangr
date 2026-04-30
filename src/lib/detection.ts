@@ -12,12 +12,15 @@
 
 import { pipeline } from '@huggingface/transformers'
 import { loadImage } from './photo'
+import { isIOS } from './preferences'
 
 /**
- * iOS Safari doesn't enable WebGPU by default — and transformers.js's
- * WebGPU→WASM fallback isn't always graceful. Pick the right backend up front.
+ * iOS Safari 18+ exposes WebGPU but the implementation is too new to trust
+ * for production ML inference (silent page reloads on transformers.js models).
+ * Force WASM on iOS until that stabilizes.
  */
 function preferredDevice(): 'webgpu' | 'wasm' {
+  if (isIOS) return 'wasm'
   if (typeof navigator !== 'undefined' && 'gpu' in navigator) return 'webgpu'
   return 'wasm'
 }
