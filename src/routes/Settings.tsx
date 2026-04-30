@@ -1,14 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import {
-  Download,
-  Trash2,
-  Shield,
-  HardDrive,
-  Github,
-  Cpu,
-  Bug,
-} from 'lucide-react'
+import { Download, Trash2, ChevronDown, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { db } from '@/db/dexie'
 import {
   deleteAllData,
@@ -18,8 +10,13 @@ import {
   type StorageEstimate,
 } from '@/lib/dataExport'
 import { toast } from '@/lib/toast'
+import { useOverlay } from '@/lib/shell'
 import { isIOS, usePrefs } from '@/lib/preferences'
 import { DiagnosticsView } from '@/components/DiagnosticsView'
+import { cn } from '@/lib/utils'
+// TEMP — demo data seeder. Remove this import + the row below + the file
+// itself (`src/lib/seedData.ts`) once you're done evaluating the new UI.
+import { fillMissingPhotos, seedExampleData } from '@/lib/seedData'
 
 export function Settings() {
   const itemCount = useLiveQuery(() => db.items.count())
@@ -28,8 +25,13 @@ export function Settings() {
   const [storage, setStorage] = useState<StorageEstimate | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const mlEnabled = usePrefs((s) => s.mlEnabled)
   const setMlEnabled = usePrefs((s) => s.setMlEnabled)
+
+  // Hide the floating TabBar while the confirm dialog is open so the
+  // destructive CTA isn't sitting next to a stray nav capsule.
+  useOverlay(confirmDelete)
 
   useEffect(() => {
     getStorageEstimate().then(setStorage)
@@ -71,138 +73,243 @@ export function Settings() {
     }
   }
 
+  // TEMP — demo seeder (dev-only). Remove together with the import.
+  async function handleSeed() {
+    setBusy(true)
+    toast.info('Fetching demo photos…')
+    try {
+      const { itemsAdded, wearsAdded, outfitsAdded, photoFallbacks } =
+        await seedExampleData()
+      const fallbackNote =
+        photoFallbacks > 0 ? ` · ${photoFallbacks} photo(s) used fallback` : ''
+      toast.success(
+        `Seeded ${itemsAdded} items · ${wearsAdded} wears · ${outfitsAdded} outfits${fallbackNote}`,
+      )
+    } catch (err) {
+      console.error(err)
+      toast.error('Seed failed — check console')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // TEMP — generate placeholder photos for items that don't have one. Useful
+  // while testing the redesign with seeded items that failed to fetch a real
+  // photo. Remove with the rest of the seedData scaffolding.
+  async function handleFillPhotos() {
+    setBusy(true)
+    try {
+      const { filled } = await fillMissingPhotos()
+      if (filled === 0) toast.info('No items missing photos')
+      else toast.success(`Generated placeholders for ${filled} item${filled === 1 ? '' : 's'}`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Photo fill failed — check console')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const isEmpty = (itemCount ?? 0) === 0
+  const usagePct =
+    storage && storage.quotaBytes > 0
+      ? Math.min(100, (storage.usageBytes / storage.quotaBytes) * 100)
+      : 0
 
   return (
-    <div className="px-4 pt-12 pb-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">Settings</h1>
+    <div className="px-5 pt-12 pb-4 max-w-md mx-auto">
+      <header className="mb-7">
+        <h1 className="font-display text-[28px] font-semibold tracking-tight text-ink-50 leading-tight">
+          Settings
+        </h1>
+        <p className="mt-1 text-[13px] text-ink-300">
+          Manage your app preferences and local data.
+        </p>
+      </header>
 
-      <Section icon={<Shield size={16} />} title="Privacy">
-        <div className="space-y-3 text-sm text-ink-300 leading-relaxed">
+      {/* Privacy preamble — editorial header + brief reassurance */}
+      <section className="mb-8">
+        <h2 className="font-display italic text-[20px] font-medium text-ink-50 tracking-tight border-b border-hairline pb-2 mb-3">
+          Privacy
+        </h2>
+        <div className="space-y-2 text-[14px] text-ink-300 leading-relaxed">
           <p>
             Hangr is local-first. Photos, wears, and item details live in
             IndexedDB on this device — nothing is uploaded.
           </p>
           <p>
-            Background removal runs in your browser. The model is downloaded
-            once from Hugging Face and then cached locally; nothing about your
-            photos goes anywhere after that.
-          </p>
-          <p>
-            No account, no telemetry, no analytics, no third-party tracking.
-            You can verify this by opening DevTools → Network.
+            On-device ML downloads its models from Hugging Face once, then
+            runs entirely in your browser. No accounts, no telemetry, no
+            analytics.
           </p>
         </div>
-      </Section>
+      </section>
 
-      <Section icon={<Cpu size={16} />} title="On-device ML">
-        <button
-          type="button"
-          onClick={() => setMlEnabled(!mlEnabled)}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-ink-800 border border-ink-700 active:scale-[0.99] transition"
-        >
-          <div className="text-left flex-1 min-w-0">
-            <div className="text-sm">Background removal & auto-detection</div>
-            <div className="mt-0.5 text-xs text-ink-500 leading-snug">
+      {/* List of rows — hairline-separated */}
+      <div className="flex flex-col">
+        {/* On-device ML */}
+        <Row>
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="text-[15px] text-ink-50">
+              On-device ML processing
+            </div>
+            <div className="mt-1 text-[12px] text-tertiary leading-snug">
               {isIOS
                 ? 'Off by default on iOS. Loading the models pushes memory close to Safari\'s limit and can crash the page.'
-                : 'Runs RMBG-1.4 + CLIP entirely in your browser. ~230MB total, downloaded once.'}
+                : 'Background removal & auto-detection. ~230MB downloaded once, then cached.'}
             </div>
           </div>
-          <span
-            className={
-              'shrink-0 inline-flex h-6 w-10 rounded-full p-0.5 transition ' +
-              (mlEnabled ? 'bg-accent' : 'bg-ink-700')
-            }
-          >
-            <span
-              className={
-                'h-5 w-5 rounded-full bg-ink-50 transition-transform ' +
-                (mlEnabled ? 'translate-x-4' : 'translate-x-0')
-              }
-            />
-          </span>
-        </button>
+          <Toggle checked={mlEnabled} onChange={setMlEnabled} />
+        </Row>
         {isIOS && mlEnabled && (
-          <div className="mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+          <div className="mb-3 -mt-2 px-3 py-2 rounded-card bg-warning/10 border border-warning/30 text-warning text-[12px]">
             Heads up: on iOS, this can cause Safari to reload the page mid-capture
             if your device is low on memory. If that happens, turn it back off.
           </div>
         )}
-      </Section>
 
-      <Section icon={<HardDrive size={16} />} title="Storage">
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <Stat label="Items" value={itemCount ?? 0} />
-          <Stat label="Photos" value={photoCount ?? 0} />
-          <Stat label="Wears" value={wearCount ?? 0} />
-        </div>
-        {storage && (
-          <div className="mt-3 text-xs text-ink-500">
-            Using {formatBytes(storage.usageBytes)} of{' '}
-            {formatBytes(storage.quotaBytes)} available on this device
+        {/* Local storage */}
+        <Row>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between">
+              <div className="text-[15px] text-ink-50">Local storage</div>
+              <div className="text-[12px] text-tertiary tabular-nums">
+                {storage
+                  ? `${formatBytes(storage.usageBytes)} / ${formatBytes(
+                      storage.quotaBytes,
+                    )}`
+                  : '—'}
+              </div>
+            </div>
+            <div className="mt-2 h-1 bg-surface-2 border border-hairline rounded-full overflow-hidden">
+              <div
+                className="h-full bg-accent rounded-full transition-[width]"
+                style={{ width: `${usagePct}%` }}
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-tertiary tabular-nums">
+              {itemCount ?? 0} items · {photoCount ?? 0} photos ·{' '}
+              {wearCount ?? 0} wears
+            </div>
+          </div>
+        </Row>
+
+        {/* Export */}
+        <RowButton onClick={handleExport} disabled={busy || isEmpty}>
+          <span className="flex-1 text-[15px] text-ink-50">
+            Export wardrobe data
+          </span>
+          <Download
+            size={18}
+            strokeWidth={1.75}
+            className="text-ink-300 group-hover:text-accent transition-colors shrink-0"
+          />
+        </RowButton>
+
+        {/* Diagnostics — expandable */}
+        <RowButton
+          onClick={() => setDiagnosticsOpen((v) => !v)}
+          aria-expanded={diagnosticsOpen}
+        >
+          <span className="flex-1 text-[15px] text-ink-50">Diagnostics</span>
+          <ChevronDown
+            size={18}
+            strokeWidth={1.75}
+            className={cn(
+              'text-ink-300 transition-transform shrink-0',
+              diagnosticsOpen && 'rotate-180',
+            )}
+          />
+        </RowButton>
+        {diagnosticsOpen && (
+          <div className="py-3 border-b border-hairline">
+            <DiagnosticsView />
           </div>
         )}
-      </Section>
 
-      <Section title="Data">
-        <button
-          onClick={handleExport}
-          disabled={busy || isEmpty}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-ink-800 border border-ink-700 active:scale-[0.99] disabled:opacity-40 transition"
-        >
-          <Download size={18} className="text-accent shrink-0" />
-          <div className="text-left flex-1">
-            <div className="text-sm">Export all data</div>
-            <div className="text-xs text-ink-500">
-              Single JSON file. Photos included as data URLs.
+        {/* About */}
+        <Row>
+          <span className="flex-1 text-[15px] text-ink-50">About Hangr</span>
+          <span className="text-[12px] text-tertiary tabular-nums">v0.7</span>
+        </Row>
+
+        {/* Demo + danger actions — separated from the regular rows */}
+        <div className="pt-12">
+          {/* TEMP — dev-only demo seeder. Remove this block + the
+              handleSeed function + the seedExampleData import once done. */}
+          {import.meta.env.DEV && (
+            <>
+              <RowButton onClick={handleSeed} disabled={busy}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] text-ink-50">Add example data</div>
+                  <div className="mt-0.5 text-[12px] text-tertiary">
+                    Dev-only · ~20 sample items, 90 days of wears, 2 outfits
+                  </div>
+                </div>
+                <Sparkles
+                  size={18}
+                  strokeWidth={1.75}
+                  className="text-accent shrink-0"
+                />
+              </RowButton>
+
+              <RowButton onClick={handleFillPhotos} disabled={busy}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] text-ink-50">Fill missing photos</div>
+                  <div className="mt-0.5 text-[12px] text-tertiary">
+                    Dev-only · canvas placeholders coloured from each item's color
+                  </div>
+                </div>
+                <ImageIcon
+                  size={18}
+                  strokeWidth={1.75}
+                  className="text-accent shrink-0"
+                />
+              </RowButton>
+            </>
+          )}
+
+          <RowButton
+            onClick={() => setConfirmDelete(true)}
+            disabled={busy || isEmpty}
+            danger
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-[15px] text-danger">Delete all data</div>
+              <div className="mt-0.5 text-[12px] text-danger/70">
+                Irreversibly remove items, photos, and wears
+              </div>
             </div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setConfirmDelete(true)}
-          disabled={busy || isEmpty}
-          className="mt-3 w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 active:scale-[0.99] disabled:opacity-40 transition"
-        >
-          <Trash2 size={18} className="text-red-400 shrink-0" />
-          <div className="text-left flex-1">
-            <div className="text-sm text-red-300">Delete all data</div>
-            <div className="text-xs text-red-400/70">
-              Wipes items, photos, wears
-            </div>
-          </div>
-        </button>
-      </Section>
-
-      <Section icon={<Bug size={16} />} title="Diagnostics">
-        <DiagnosticsView />
-      </Section>
-
-      <Section icon={<Github size={16} />} title="About">
-        <div className="text-sm text-ink-300 leading-relaxed">
-          Hangr v0.5 — a privacy-first wardrobe tracker. Built by Deraj.
+            <Trash2
+              size={18}
+              strokeWidth={1.75}
+              className="text-danger/70 group-hover:text-danger transition-colors shrink-0"
+            />
+          </RowButton>
         </div>
-        <div className="mt-3 text-[10px] text-ink-500 font-mono break-all">
-          build: {__BUILD_TIME__}
-        </div>
-      </Section>
+      </div>
 
-      <div className="mt-8 text-center text-xs text-ink-500">
+      <div className="mt-8 text-[11px] text-tertiary text-center font-mono break-all">
+        build · {__BUILD_TIME__}
+      </div>
+
+      <div className="mt-3 text-[11px] text-tertiary text-center">
         Made with care · all data stays on your device
       </div>
 
       {confirmDelete && (
         <div
-          className="fixed inset-0 z-[55] flex items-center justify-center bg-ink-950/80 backdrop-blur p-4"
+          className="fixed inset-0 z-[55] flex items-center justify-center bg-ink-950/80 backdrop-blur-sm p-4"
           onClick={() => !busy && setConfirmDelete(false)}
         >
           <div
-            className="bg-ink-900 border border-ink-800 rounded-2xl p-5 max-w-sm w-full"
+            className="bg-surface-1 border border-hairline rounded-card p-5 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold">Delete everything?</h3>
-            <p className="mt-2 text-sm text-ink-400">
+            <h3 className="font-display text-[18px] font-medium text-ink-50">
+              Delete everything?
+            </h3>
+            <p className="mt-2 text-[13px] text-ink-300 leading-relaxed">
               This permanently removes all items, photos, and wear logs from
               this device. Cannot be undone.
             </p>
@@ -210,14 +317,14 @@ export function Settings() {
               <button
                 disabled={busy}
                 onClick={() => setConfirmDelete(false)}
-                className="px-4 py-2 rounded-full text-sm text-ink-300 disabled:opacity-50"
+                className="px-4 py-2 rounded-full text-sm text-ink-300 hover:text-ink-50 disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 disabled={busy}
                 onClick={handleDelete}
-                className="px-4 py-2 rounded-full bg-red-500 text-white text-sm font-medium disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-danger text-ink-950 text-sm font-medium disabled:opacity-50"
               >
                 {busy ? 'Deleting…' : 'Delete everything'}
               </button>
@@ -229,33 +336,71 @@ export function Settings() {
   )
 }
 
-function Section({
-  icon,
-  title,
-  children,
-}: {
-  icon?: ReactNode
-  title: string
-  children: ReactNode
-}) {
+function Row({ children }: { children: ReactNode }) {
   return (
-    <section className="mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        {icon && <span className="text-accent">{icon}</span>}
-        <h2 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-          {title}
-        </h2>
-      </div>
+    <div className="flex items-start gap-3 py-4 border-b border-hairline">
       {children}
-    </section>
+    </div>
   )
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
+function RowButton({
+  children,
+  onClick,
+  disabled,
+  danger,
+  ...rest
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+  'aria-expanded'?: boolean
+}) {
   return (
-    <div className="rounded-xl bg-ink-800 border border-ink-800 p-3">
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-ink-400">{label}</div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'group flex items-center gap-3 py-4 border-b border-hairline text-left transition-colors disabled:opacity-40',
+        !danger && 'hover:[&_span:first-child]:text-accent',
+      )}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'relative inline-flex h-6 w-11 shrink-0 rounded-full border transition-colors',
+        checked
+          ? 'bg-accent border-accent'
+          : 'bg-surface-2 border-hairline',
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 h-[18px] w-[18px] rounded-full transition-transform',
+          checked
+            ? 'translate-x-[22px] bg-ink-950'
+            : 'translate-x-0.5 bg-ink-300',
+        )}
+      />
+    </button>
   )
 }

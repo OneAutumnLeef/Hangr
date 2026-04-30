@@ -66,11 +66,16 @@ export function OutfitEditorSheet({
 
   const canSave = name.trim().length > 0 && selected.size > 0
 
+  // Edit framing kicks in only when the caller supplied a name to start from.
+  // Empty-name initial = "create with prefilled items" (used by the auto
+  // save-this-combo suggestion on Log).
+  const isEditing = !!initial?.name
+
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title={initial ? 'Edit outfit' : 'New outfit'}
+      title={isEditing ? 'Edit outfit' : 'New outfit'}
       footer={
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-ink-400">
@@ -93,7 +98,7 @@ export function OutfitEditorSheet({
               disabled={!canSave}
               className="px-4 py-2 rounded-full bg-accent text-ink-950 text-sm font-medium disabled:opacity-40"
             >
-              {initial ? 'Save changes' : 'Save outfit'}
+              {isEditing ? 'Save changes' : 'Save outfit'}
             </button>
           </div>
         </div>

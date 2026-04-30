@@ -49,7 +49,7 @@ export function MiniItemThumb({
     <Tag
       onClick={onClick}
       className={cn(
-        'shrink-0 rounded-xl overflow-hidden bg-ink-800 border-2 flex items-center justify-center transition',
+        'shrink-0 rounded-xl overflow-hidden bg-surface-2 border-2 flex items-center justify-center transition-colors',
         SIZE_CLASS[size],
         selected ? 'border-accent' : 'border-transparent',
       )}
@@ -62,7 +62,7 @@ export function MiniItemThumb({
           className="max-h-full max-w-full object-contain"
         />
       ) : (
-        <div className="text-ink-500 text-[10px] px-1 text-center">
+        <div className="text-tertiary text-[10px] px-1 text-center">
           {item.name.slice(0, 2)}
         </div>
       )}

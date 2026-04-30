@@ -5,7 +5,7 @@ export function Layout() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-ink-950">
       <main
-        className="flex-1 pb-24"
+        className="flex-1 pb-28"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <Outlet />

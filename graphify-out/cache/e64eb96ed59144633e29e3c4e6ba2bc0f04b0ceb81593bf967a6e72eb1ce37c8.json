@@ -1,0 +1,1 @@
+{"nodes": [{"id": "pwa_assets_config_ts", "label": "pwa-assets.config.ts", "file_type": "code", "source_file": "pwa-assets.config.ts", "source_location": "L1"}], "edges": [{"source": "pwa_assets_config_ts", "target": "config", "relation": "imports_from", "confidence": "EXTRACTED", "source_file": "pwa-assets.config.ts", "source_location": "L1", "weight": 1.0}], "raw_calls": []}

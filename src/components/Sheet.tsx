@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useOverlay } from '@/lib/shell'
 
 interface Props {
   open: boolean
@@ -11,6 +12,10 @@ interface Props {
 
 /** Bottom-sheet modal. Tap backdrop to close. */
 export function Sheet({ open, onClose, title, children, footer }: Props) {
+  // Tells the shell to fade the floating TabBar out while we're open — the
+  // capsule nav otherwise sits over the sheet's footer / action buttons.
+  useOverlay(open)
+
   // Lock body scroll while open
   useEffect(() => {
     if (!open) return

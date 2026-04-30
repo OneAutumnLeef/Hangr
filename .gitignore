@@ -34,9 +34,5 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# PWA assets generator output (these are committed if you want, or regenerate)
-# Comment the next lines out if you'd rather check generated icons in.
-public/pwa-*.png
-public/maskable-*.png
-public/apple-touch-icon.png
-public/favicon.ico
+# PWA assets are committed so deployed builds always have the icons.
+# Regenerate via `npm run generate-pwa-assets` whenever icon.png changes.

@@ -5,7 +5,6 @@ import {
   ImagePlus,
   Sparkles,
   Loader2,
-  Wand2,
   X,
   Layers,
 } from 'lucide-react'
@@ -278,16 +277,16 @@ export function Capture() {
       : variants?.original
 
   return (
-    <div className="px-4 pt-12 max-w-md mx-auto">
+    <div className="px-5 pt-12 max-w-md mx-auto">
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">
-          {variants ? 'New item' : 'Add an item'}
+        <h1 className="font-display text-[28px] font-semibold tracking-tight text-ink-50 leading-tight">
+          {variants ? 'New item' : 'Add'}
         </h1>
         {variants && (
           <button
             onClick={clearVariants}
             disabled={saving}
-            className="text-sm text-ink-400 hover:text-ink-100 disabled:opacity-50"
+            className="text-sm text-ink-300 hover:text-ink-50 disabled:opacity-50"
           >
             Retake
           </button>
@@ -295,47 +294,41 @@ export function Capture() {
       </header>
 
       {error && (
-        <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+        <div className="mb-4 px-3 py-2 rounded-card bg-danger/10 border border-danger/30 text-danger text-sm">
           {error}
         </div>
       )}
 
       {!variants && (
         <div className="space-y-3">
-          <p className="text-ink-400 text-sm leading-relaxed mb-2">
-            Photograph an item or pick one from your gallery. Photos and the
-            ML models run on this device — nothing is uploaded.
+          <p className="text-tertiary text-[13px] leading-relaxed mb-4">
+            Photos and the on-device ML run here — nothing is uploaded.
           </p>
 
           <button
             onClick={() => cameraInputRef.current?.click()}
             disabled={busy}
-            className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-accent text-ink-950 font-medium active:scale-[0.99] transition disabled:opacity-50"
+            className="w-full h-14 flex items-center justify-center gap-3 rounded-full bg-accent text-ink-950 font-medium active:scale-[0.99] transition-transform disabled:opacity-50"
           >
-            <CameraIcon size={20} />
+            <CameraIcon size={20} strokeWidth={1.75} />
             Take a photo
           </button>
 
           <button
             onClick={() => galleryInputRef.current?.click()}
             disabled={busy}
-            className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-ink-800 border border-ink-700 text-ink-100 active:scale-[0.99] transition disabled:opacity-50"
+            className="w-full h-14 flex items-center justify-center gap-3 rounded-full bg-surface-2 border border-hairline text-ink-50 active:scale-[0.99] transition-transform disabled:opacity-50"
           >
-            <ImagePlus size={20} />
+            <ImagePlus size={20} strokeWidth={1.75} />
             Pick from gallery
           </button>
 
           <Link
             to="/capture/bulk"
-            className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-ink-900 border border-ink-800 text-ink-200 active:scale-[0.99] transition"
+            className="w-full h-14 flex items-center justify-center gap-3 rounded-full bg-surface-1 border border-hairline text-ink-300 active:scale-[0.99] transition-transform"
           >
-            <Layers size={20} />
-            <div className="flex-1 text-left">
-              <div className="text-sm">Add many at once</div>
-              <div className="text-xs text-ink-500">
-                Pick a batch from your gallery — review and save together
-              </div>
-            </div>
+            <Layers size={18} strokeWidth={1.75} />
+            <span className="text-[15px]">Add many at once</span>
           </Link>
 
           <input
@@ -360,10 +353,10 @@ export function Capture() {
         <div className="space-y-4">
           <div
             className={cn(
-              'relative rounded-2xl overflow-hidden aspect-square flex items-center justify-center',
+              'relative rounded-card overflow-hidden aspect-square flex items-center justify-center border border-hairline',
               showVariant === 'cutout' && variants.cutout
-                ? 'bg-[image:repeating-conic-gradient(theme(colors.ink.800)_0%_25%,theme(colors.ink.900)_0%_50%)] bg-[length:24px_24px]'
-                : 'bg-ink-800',
+                ? 'bg-checker'
+                : 'bg-surface-2',
             )}
           >
             <img
@@ -371,81 +364,80 @@ export function Capture() {
               alt="Captured item"
               className="max-h-full max-w-full object-contain"
             />
+
+            {/* Cutout/Original toggle — bottom-center overlay. Only when ML is
+                enabled and we actually have a cutout to switch to. */}
+            {mlEnabled && variants.cutout && !removing && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1 bg-surface-1/90 backdrop-blur-sm border border-hairline rounded-full">
+                <button
+                  onClick={() => setShowVariant('cutout')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    showVariant === 'cutout'
+                      ? 'bg-surface-2 text-ink-50'
+                      : 'text-ink-300',
+                  )}
+                >
+                  <Sparkles size={12} strokeWidth={2} />
+                  Cutout
+                </button>
+                <button
+                  onClick={() => setShowVariant('original')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    showVariant === 'original'
+                      ? 'bg-surface-2 text-ink-50'
+                      : 'text-ink-300',
+                  )}
+                >
+                  Original
+                </button>
+              </div>
+            )}
+
             {removing && (
-              <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-center px-6">
+              <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-center px-6">
                 <Loader2
                   className="animate-spin text-accent mb-3"
                   size={28}
+                  strokeWidth={2}
                 />
-                <div className="text-sm text-ink-100">
+                <div className="text-sm text-ink-50">
                   {removalProgress?.stage === 'loading-model'
                     ? 'Downloading background-removal model'
                     : 'Removing background'}
                 </div>
                 {removalProgress?.stage === 'loading-model' && (
                   <>
-                    <div className="mt-3 h-1.5 w-40 bg-ink-700 rounded-full overflow-hidden">
+                    <div className="mt-3 h-1 w-40 bg-surface-2 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-accent transition-[width]"
                         style={{ width: `${removalProgress.progress}%` }}
                       />
                     </div>
-                    <div className="text-xs text-ink-400 mt-2">
+                    <div className="text-xs text-tertiary mt-2">
                       First-time download · cached after this
                     </div>
                   </>
                 )}
-                <div className="mt-3 text-[10px] text-ink-400 tabular-nums">
+                <div className="mt-3 text-[10px] text-tertiary tabular-nums">
                   {elapsedSec}s elapsed
                 </div>
                 <button
                   type="button"
                   onClick={handleSkipML}
-                  className="mt-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-ink-800 border border-ink-700 text-xs text-ink-200 active:scale-95 transition"
+                  className="mt-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-2 border border-hairline text-xs text-ink-300 active:scale-95 transition-transform"
                 >
-                  <X size={12} />
+                  <X size={12} strokeWidth={1.75} />
                   Skip — use original
                 </button>
               </div>
             )}
           </div>
 
-          {/* Variant toggle — only when ML is enabled. With ML off, we
-              save the original and skip the cutout/original UI entirely. */}
-          {mlEnabled && (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1 bg-ink-800 rounded-full p-1">
-                <button
-                  onClick={() => setShowVariant('cutout')}
-                  disabled={!variants.cutout || removing}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-xs font-medium transition disabled:opacity-40',
-                    showVariant === 'cutout'
-                      ? 'bg-ink-700 text-ink-50'
-                      : 'text-ink-400',
-                  )}
-                >
-                  <Sparkles size={12} className="inline mr-1 -mt-0.5" />
-                  Cutout
-                </button>
-                <button
-                  onClick={() => setShowVariant('original')}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-xs font-medium transition',
-                    showVariant === 'original'
-                      ? 'bg-ink-700 text-ink-50'
-                      : 'text-ink-400',
-                  )}
-                >
-                  Original
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* When ML is off, show a tiny note explaining what's happening */}
           {!mlEnabled && (
-            <div className="text-xs text-ink-500">
+            <div className="text-xs text-tertiary">
               Saving photo as-is.{' '}
               {isIOS ? 'On-device ML is off by default on iOS to avoid memory issues. ' : ''}
               <Link to="/settings" className="text-accent">
@@ -457,34 +449,38 @@ export function Capture() {
 
           {/* Surface bg removal error inline so users can debug without devtools */}
           {variants.cutoutFailed && (
-            <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <div className="px-3 py-2 rounded-card bg-warning/10 border border-warning/30 text-warning text-xs">
               <div className="font-medium">
                 Cutout couldn't run — saving original instead.
               </div>
               {variants.cutoutError && (
-                <div className="mt-1 text-amber-300/80 break-words">
+                <div className="mt-1 text-warning/80 break-words">
                   {variants.cutoutError}
                 </div>
               )}
             </div>
           )}
 
-          {/* Auto-detection banner */}
+          {/* Auto-detection inline status */}
           {(detecting || detected) && (
-            <div className="flex items-center justify-between gap-2 text-xs text-ink-300">
+            <div className="flex items-center justify-between gap-2 text-xs">
               {detecting ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 size={12} className="animate-spin text-accent" />
+                <div className="flex items-center gap-2 text-ink-300">
+                  <Loader2
+                    size={12}
+                    className="animate-spin text-accent"
+                    strokeWidth={2}
+                  />
                   <span>
                     Auto-detecting category & color…{' '}
-                    <span className="tabular-nums text-ink-500">
+                    <span className="tabular-nums text-tertiary">
                       {elapsedSec}s
                     </span>
                   </span>
                 </div>
               ) : detected && (detected.category || detected.color) ? (
-                <div className="flex items-center gap-2">
-                  <Wand2 size={12} className="text-accent" />
+                <div className="flex items-center gap-2 text-accent">
+                  <Sparkles size={12} strokeWidth={2} />
                   <span>Auto-filled below — edit if wrong.</span>
                 </div>
               ) : null}
@@ -492,7 +488,7 @@ export function Capture() {
                 <button
                   type="button"
                   onClick={handleSkipML}
-                  className="text-ink-400 hover:text-ink-100"
+                  className="text-tertiary hover:text-ink-50"
                 >
                   Skip
                 </button>
@@ -502,11 +498,11 @@ export function Capture() {
 
           {/* Detection error (e.g. CLIP failed to load on iOS) */}
           {detectionError && !detecting && (
-            <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            <div className="px-3 py-2 rounded-card bg-warning/10 border border-warning/30 text-warning text-xs">
               <div className="font-medium">
                 Auto-detection couldn't run.
               </div>
-              <div className="mt-1 text-amber-300/80 break-words">
+              <div className="mt-1 text-warning/80 break-words">
                 {detectionError}
               </div>
             </div>

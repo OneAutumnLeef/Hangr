@@ -21,19 +21,19 @@ export function OutfitChip({ outfit, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className="shrink-0 w-28 flex flex-col items-stretch gap-1.5 group"
+      className="snap-start shrink-0 w-40 flex flex-col items-stretch gap-2 group text-left"
     >
-      <div className="grid grid-cols-2 gap-0.5 rounded-xl bg-ink-900 border border-ink-800 overflow-hidden aspect-square p-1 group-active:scale-95 transition">
+      <div className="grid grid-cols-2 gap-1 rounded-card bg-surface-1 border border-hairline overflow-hidden aspect-square p-2 group-active:scale-[0.98] transition-transform">
         {[0, 1, 2, 3].map((i) => (
           <OutfitTile key={i} item={tileItems[i]} />
         ))}
       </div>
-      <div className="text-xs text-ink-100 truncate text-left px-0.5">
-        {outfit.name}
-      </div>
-      <div className="text-[10px] text-ink-500 px-0.5 text-left">
-        {outfit.itemIds.length}{' '}
-        {outfit.itemIds.length === 1 ? 'item' : 'items'}
+      <div>
+        <div className="text-[13px] text-ink-50 truncate">{outfit.name}</div>
+        <div className="text-[11px] text-tertiary tabular-nums">
+          {outfit.itemIds.length}{' '}
+          {outfit.itemIds.length === 1 ? 'item' : 'items'}
+        </div>
       </div>
     </button>
   )
@@ -60,10 +60,10 @@ function OutfitTile({ item }: { item?: Item }) {
   }, [photo?.blob])
 
   if (!item) {
-    return <div className="bg-ink-800/40 rounded-md" />
+    return <div className="bg-surface-2/40 rounded-md" />
   }
   return (
-    <div className="bg-ink-800 rounded-md overflow-hidden flex items-center justify-center">
+    <div className="bg-surface-2 rounded-md overflow-hidden flex items-center justify-center">
       {url ? (
         <img
           src={url}
@@ -71,7 +71,7 @@ function OutfitTile({ item }: { item?: Item }) {
           className="max-h-full max-w-full object-contain"
         />
       ) : (
-        <div className="text-ink-500 text-[9px] text-center px-1">
+        <div className="text-tertiary text-[9px] text-center px-1">
           {item.name.slice(0, 2)}
         </div>
       )}

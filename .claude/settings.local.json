@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "mcp__stitch__list_projects",
+      "mcp__stitch__list_screens",
+      "mcp__stitch__get_screen",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(mkdir -p /tmp/stitch-mockups)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzI2MzYwY2VmZGM2NjQyYTA5MWQwYTNhNzM4MmI0OWMxEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/closet.html)",
+      "Bash(cygpath -w /tmp/stitch-mockups/closet.html)",
+      "Bash(npm run *)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzdhMzg4NmEyNTRlNDQxZjE5MDA3ZWU1MTU2NTc0ZDFlEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/capture.html)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzBlN2RiOGMyYTJkNDQ2MDc5ODQzZGEzYTNkMTRmZGM2EgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/item-detail.html)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sX2E4Zjc4ODY4NWY1ZjRiMTI5MTE4MzcxNGZhMDA4NzcwEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/log.html)",
+      "Bash(curl -sSL -w \"HTTP %{http_code} size=%{size_download}\\\\n\" \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sX2E4Zjc4ODY4NWY1ZjRiMTI5MTE4MzcxNGZhMDA4NzcwEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/log.html)",
+      "Bash(curl -sSL -w \"HTTP %{http_code}\\\\n\" \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzMxZWM1MDk2M2ViNDQzNmVhMTg1OTRmYmI5NTRmZWJlEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/log.html)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sX2RlNDU0ZDU2ZmViNjQ4NDE4MDM5ZWIwOTliNGU0MWFmEgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/insights.html)",
+      "Bash(curl -sSL \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sX2ZlMzgyNjFjNDg4NzQ3OWM5MzEzOTc4N2U0NGE0YmU1EgsSBxDlvab43g0YAZIBJAoKcHJvamVjdF9pZBIWQhQxNzYyMTIwMTY0NDcyOTIyMjY1NA&filename=&opi=89354086\" -o /tmp/stitch-mockups/settings.html)",
+      "Bash(curl *)"
+    ]
+  }
+}

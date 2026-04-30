@@ -8,11 +8,13 @@ import { db } from '@/db/dexie'
  * old shapes if we ever ship import.
  */
 export async function exportAllData(): Promise<Blob> {
-  const [items, photos, wears, outfits] = await Promise.all([
+  const [items, photos, wears, outfits, dayNotes, wants] = await Promise.all([
     db.items.toArray(),
     db.itemPhotos.toArray(),
     db.wears.toArray(),
     db.outfits.toArray(),
+    db.dayNotes.toArray(),
+    db.wants.toArray(),
   ])
 
   const photosWithDataUrl = await Promise.all(
@@ -28,12 +30,14 @@ export async function exportAllData(): Promise<Blob> {
   )
 
   const dump = {
-    schema: 'hangr/v2',
+    schema: 'hangr/v4',
     exportedAt: new Date().toISOString(),
     items,
     itemPhotos: photosWithDataUrl,
     wears,
     outfits,
+    dayNotes,
+    wants,
   }
 
   return new Blob([JSON.stringify(dump)], { type: 'application/json' })
@@ -43,15 +47,14 @@ export async function exportAllData(): Promise<Blob> {
 export async function deleteAllData() {
   await db.transaction(
     'rw',
-    db.items,
-    db.itemPhotos,
-    db.wears,
-    db.outfits,
+    [db.items, db.itemPhotos, db.wears, db.outfits, db.dayNotes, db.wants],
     async () => {
       await db.items.clear()
       await db.itemPhotos.clear()
       await db.wears.clear()
       await db.outfits.clear()
+      await db.dayNotes.clear()
+      await db.wants.clear()
     },
   )
 }

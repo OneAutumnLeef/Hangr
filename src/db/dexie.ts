@@ -106,6 +106,42 @@ export interface Outfit {
   archivedAt?: number
 }
 
+/**
+ * Per-day diary note ("Wore this to Sneha's wedding"). Kept in its own table
+ * keyed by `dayMs` so the note survives even if every wear from that day is
+ * later deleted, and the user only ever maintains one note per day.
+ */
+export interface DayNote {
+  /** Start-of-day ms in the user's local timezone — primary key. */
+  dayMs: number
+  note: string
+  updatedAt: number
+}
+
+/**
+ * Pre-purchase consideration. Items the user is THINKING about buying — used
+ * to gut-check against existing inventory ("you already own 4 white shirts")
+ * before pulling the trigger. Once decided, the row is archived (kept for
+ * the record) rather than deleted.
+ */
+export interface Want {
+  id: string
+  name: string
+  category?: string
+  color?: string
+  brand?: string
+  /** Estimated price in minor units (paise). */
+  estimatedPriceMinor?: number
+  /** Where the user saw it (URL, store, etc.) — optional context. */
+  source?: string
+  /** Free-form note: why they want it, occasion, etc. */
+  note?: string
+  createdAt: number
+  /** Decision outcome — left undefined while still being considered. */
+  decision?: 'bought' | 'passed'
+  decidedAt?: number
+}
+
 // ─── Dexie schema ───────────────────────────────────────────────────────────
 
 const db = new Dexie('hangr') as Dexie & {
@@ -113,6 +149,8 @@ const db = new Dexie('hangr') as Dexie & {
   itemPhotos: EntityTable<ItemPhoto, 'id'>
   wears: EntityTable<Wear, 'id'>
   outfits: EntityTable<Outfit, 'id'>
+  dayNotes: EntityTable<DayNote, 'dayMs'>
+  wants: EntityTable<Want, 'id'>
 }
 
 // v1 — initial schema
@@ -135,6 +173,24 @@ db.version(3).stores({
   itemPhotos: 'id, itemId, createdAt',
   wears: 'id, itemId, wornAt, outfitId, createdAt',
   outfits: 'id, archivedAt, createdAt',
+})
+// v4 — per-day diary notes. Primary key is the day timestamp itself so each
+// day has at most one note; no separate id needed.
+db.version(4).stores({
+  items: 'id, category, archivedAt, createdAt, source',
+  itemPhotos: 'id, itemId, createdAt',
+  wears: 'id, itemId, wornAt, outfitId, createdAt',
+  outfits: 'id, archivedAt, createdAt',
+  dayNotes: '&dayMs, updatedAt',
+})
+// v5 — want list (pre-purchase consideration).
+db.version(5).stores({
+  items: 'id, category, archivedAt, createdAt, source',
+  itemPhotos: 'id, itemId, createdAt',
+  wears: 'id, itemId, wornAt, outfitId, createdAt',
+  outfits: 'id, archivedAt, createdAt',
+  dayNotes: '&dayMs, updatedAt',
+  wants: 'id, decision, createdAt, decidedAt',
 })
 
 // Useful for ad-hoc inspection in DevTools while building.

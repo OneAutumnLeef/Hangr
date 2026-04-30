@@ -15,6 +15,11 @@ import {
   History,
   Plus,
   X,
+  Tag,
+  Palette,
+  Store,
+  Calendar,
+  IndianRupee,
 } from 'lucide-react'
 import { db, type ArchivedReason } from '@/db/dexie'
 import {
@@ -27,6 +32,7 @@ import {
 import { deleteWear, listWearsForItem, logWear } from '@/db/wears'
 import { ItemForm, type ItemFormValues } from '@/components/ItemForm'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
+import { MetadataPill } from '@/components/MetadataPill'
 import { processPhoto } from '@/lib/photo'
 import { removeBackground, type BgRemovalProgress } from '@/lib/bgRemoval'
 import { toast } from '@/lib/toast'
@@ -36,6 +42,7 @@ import {
   relativeDayLabel,
   shortDate,
 } from '@/lib/dates'
+import { cn } from '@/lib/utils'
 
 const ARCHIVED_REASON_LABELS: Record<ArchivedReason, string> = {
   donated: 'Donated',
@@ -95,12 +102,12 @@ export function ItemDetail() {
   }, [photo?.blob])
 
   if (item === undefined) {
-    return <div className="px-4 pt-12 text-ink-400">Loading…</div>
+    return <div className="px-5 pt-12 text-tertiary">Loading…</div>
   }
 
   if (!item) {
     return (
-      <div className="px-4 pt-12 max-w-md mx-auto">
+      <div className="px-5 pt-12 max-w-md mx-auto">
         <p className="text-ink-300">Item not found.</p>
         <Link to="/closet" className="text-accent text-sm">
           Back to closet
@@ -271,176 +278,197 @@ export function ItemDetail() {
   }
 
   return (
-    <div className="max-w-md mx-auto pb-8">
-      <header className="px-4 pt-12 pb-4 flex items-center justify-between">
-        <button
+    <div className="max-w-md mx-auto pb-8 relative">
+      {/* Floating header — circle buttons overlay the photo */}
+      <header className="absolute top-0 left-0 right-0 px-4 pt-12 pb-4 z-20 flex items-center justify-between">
+        <CircleButton
           onClick={() => (editing ? setEditing(false) : navigate(-1))}
-          className="p-2 -ml-2 rounded-lg text-ink-300 hover:text-ink-50"
-          aria-label="Back"
+          ariaLabel="Back"
         >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex items-center gap-1">
+          <ArrowLeft size={18} strokeWidth={1.75} />
+        </CircleButton>
+        <div className="flex items-center gap-2">
           {!editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="p-2 rounded-lg text-ink-300 hover:text-ink-50"
-              aria-label="Edit"
-            >
-              <Pencil size={18} />
-            </button>
+            <CircleButton onClick={() => setEditing(true)} ariaLabel="Edit">
+              <Pencil size={16} strokeWidth={1.75} />
+            </CircleButton>
           )}
           {item.archivedAt ? (
-            <button
+            <CircleButton
               onClick={handleUnarchive}
               disabled={busy}
-              className="p-2 rounded-lg text-ink-300 hover:text-ink-50 disabled:opacity-50"
-              aria-label="Unarchive"
-              title="Unarchive"
+              ariaLabel="Unarchive"
             >
-              <ArchiveRestore size={18} />
-            </button>
+              <ArchiveRestore size={16} strokeWidth={1.75} />
+            </CircleButton>
           ) : (
-            <button
+            <CircleButton
               onClick={() => setArchiveOpen(true)}
               disabled={busy}
-              className="p-2 rounded-lg text-ink-300 hover:text-ink-50 disabled:opacity-50"
-              aria-label="Archive"
-              title="Archive"
+              ariaLabel="Archive"
             >
-              <Archive size={18} />
-            </button>
+              <Archive size={16} strokeWidth={1.75} />
+            </CircleButton>
           )}
         </div>
       </header>
 
-      {error && (
-        <div className="mx-4 mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
-          {error}
-        </div>
-      )}
-
-      {item.archivedAt && (
-        <div className="mx-4 mb-4 px-3 py-2 rounded-xl bg-ink-800 border border-ink-700 text-ink-300 text-xs">
-          <div className="flex items-center gap-2">
-            <Archive size={14} />
-            <span>
-              Archived{' '}
-              {item.archivedReason
-                ? `· ${ARCHIVED_REASON_LABELS[item.archivedReason]}`
-                : ''}{' '}
-              · {new Date(item.archivedAt).toLocaleDateString('en-IN')}
-            </span>
-          </div>
-          {item.archivedNote && (
-            <div className="mt-1 ml-6 text-ink-400">{item.archivedNote}</div>
-          )}
-        </div>
-      )}
-
-      <div className="px-4">
-        <div
-          className={
-            'relative rounded-2xl overflow-hidden aspect-square flex items-center justify-center ' +
-            (photo?.isProcessed
-              ? 'bg-[image:repeating-conic-gradient(theme(colors.ink.800)_0%_25%,theme(colors.ink.900)_0%_50%)] bg-[length:24px_24px]'
-              : 'bg-ink-800')
-          }
-        >
-          {url ? (
-            <img
-              src={url}
-              alt={item.name}
-              className="max-h-full max-w-full object-contain"
-            />
-          ) : (
-            <div className="text-ink-500">No photo</div>
-          )}
-          {replacing && (
-            <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-center px-6">
-              <Loader2 className="animate-spin text-accent mb-3" size={24} />
-              <div className="text-sm text-ink-100">
-                {replacingProgress?.stage === 'loading-model'
-                  ? 'Downloading model'
-                  : 'Removing background'}
-              </div>
-            </div>
-          )}
-          {!editing && !replacing && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-2 right-2 p-2 rounded-full bg-ink-900/80 border border-ink-700 text-ink-100 backdrop-blur active:scale-95 transition"
-              aria-label="Replace photo"
-              title="Replace photo"
-            >
-              <ImagePlus size={16} />
-            </button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleReplacePhoto}
-            className="hidden"
+      {/* Hero photo — full-bleed square */}
+      <div
+        className={cn(
+          'relative w-full aspect-square flex items-center justify-center overflow-hidden',
+          photo?.isProcessed ? 'bg-checker' : 'bg-surface-2',
+        )}
+      >
+        {url ? (
+          <img
+            src={url}
+            alt={item.name}
+            className={
+              photo?.isProcessed
+                ? 'max-h-full max-w-full object-contain'
+                : 'w-full h-full object-cover'
+            }
           />
-        </div>
+        ) : (
+          <div className="text-tertiary">No photo</div>
+        )}
 
-        {photo?.isProcessed && (
-          <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-ink-400">
-            <Sparkles size={12} className="text-accent" />
-            Background removed on this device
+        {replacing && (
+          <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-center px-6">
+            <Loader2
+              className="animate-spin text-accent mb-3"
+              size={24}
+              strokeWidth={2}
+            />
+            <div className="text-sm text-ink-50">
+              {replacingProgress?.stage === 'loading-model'
+                ? 'Downloading model'
+                : 'Removing background'}
+            </div>
+          </div>
+        )}
+
+        {!editing && !replacing && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute bottom-3 right-3 p-2 rounded-full bg-surface-1/90 border border-hairline text-ink-50 backdrop-blur-sm active:scale-95 transition-transform"
+            aria-label="Replace photo"
+            title="Replace photo"
+          >
+            <ImagePlus size={16} strokeWidth={1.75} />
+          </button>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleReplacePhoto}
+          className="hidden"
+        />
+      </div>
+
+      {/* Info card — pulled up over the photo */}
+      <div className="relative -mt-6 bg-surface-1 rounded-t-sheet border-t border-hairline px-5 pt-7 pb-8">
+        {error && (
+          <div className="mb-4 px-3 py-2 rounded-card bg-danger/10 border border-danger/30 text-danger text-sm">
+            {error}
+          </div>
+        )}
+
+        {item.archivedAt && (
+          <div className="mb-4 px-3 py-2 rounded-card bg-surface-2 border border-hairline text-ink-300 text-xs">
+            <div className="flex items-center gap-2">
+              <Archive size={14} strokeWidth={1.75} />
+              <span>
+                Archived
+                {item.archivedReason
+                  ? ` · ${ARCHIVED_REASON_LABELS[item.archivedReason]}`
+                  : ''}{' '}
+                · {new Date(item.archivedAt).toLocaleDateString('en-IN')}
+              </span>
+            </div>
+            {item.archivedNote && (
+              <div className="mt-1 ml-6 text-tertiary">{item.archivedNote}</div>
+            )}
           </div>
         )}
 
         {editing ? (
-          <div className="mt-6">
-            <ItemForm
-              onSubmit={handleSaveEdit}
-              disabled={busy}
-              submitLabel="Save changes"
-              initial={{
-                name: item.name,
-                category: item.category,
-                color: item.color,
-                brand: item.brand,
-                priceRupees:
-                  item.purchasePriceMinor != null
-                    ? item.purchasePriceMinor / 100
-                    : undefined,
-                purchasedAt: item.purchasedAt,
-                seedWearCount: item.seedWearCount,
-                seedAsOf: item.seedAsOf,
-              }}
-            />
-          </div>
+          <ItemForm
+            onSubmit={handleSaveEdit}
+            disabled={busy}
+            submitLabel="Save changes"
+            initial={{
+              name: item.name,
+              category: item.category,
+              color: item.color,
+              brand: item.brand,
+              priceRupees:
+                item.purchasePriceMinor != null
+                  ? item.purchasePriceMinor / 100
+                  : undefined,
+              purchasedAt: item.purchasedAt,
+              seedWearCount: item.seedWearCount,
+              seedAsOf: item.seedAsOf,
+            }}
+          />
         ) : (
           <>
-            <div className="mt-6">
-              <h1 className="text-2xl font-semibold">{item.name}</h1>
-              {item.category && (
-                <div className="mt-1 text-sm text-ink-400">{item.category}</div>
-              )}
-            </div>
+            {/* Header — Fraunces name + inline stats */}
+            <h1 className="font-display text-[22px] font-medium tracking-tight text-ink-50 leading-tight">
+              {item.name}
+            </h1>
+
+            {(totalWearCount > 0 || cpw != null || lastRealWornAt) && (
+              <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-1 text-[13px] text-ink-300">
+                {totalWearCount > 0 && (
+                  <span className="tabular-nums">Worn {totalWearCount}×</span>
+                )}
+                {cpw != null && (
+                  <>
+                    <Dot />
+                    <span className="tabular-nums">
+                      ₹{Math.round(cpw).toLocaleString('en-IN')} / wear
+                    </span>
+                  </>
+                )}
+                {lastRealWornAt && (
+                  <>
+                    <Dot />
+                    <span>Last worn {relativeDayLabel(lastRealWornAt)}</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {photo?.isProcessed && (
+              <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-tertiary">
+                <Sparkles size={11} strokeWidth={2} className="text-accent" />
+                Background removed on this device
+              </div>
+            )}
 
             {/* Wear-today CTA */}
             <button
               onClick={handleWearToday}
               disabled={busy || !!item.archivedAt}
-              className={
-                'mt-5 w-full px-4 py-3 rounded-2xl font-medium flex items-center justify-center gap-2 transition active:scale-[0.99] disabled:opacity-50 ' +
-                (wornToday
-                  ? 'bg-ink-800 border border-accent text-accent'
-                  : 'bg-accent text-ink-950')
-              }
+              className={cn(
+                'mt-5 w-full h-12 rounded-full font-medium flex items-center justify-center gap-2 transition-transform active:scale-[0.99] disabled:opacity-50',
+                wornToday
+                  ? 'bg-surface-2 border border-accent text-accent'
+                  : 'bg-accent text-ink-950',
+              )}
             >
               {wornToday ? (
                 <>
-                  <Check size={18} />
+                  <Check size={18} strokeWidth={2} />
                   Worn today
                 </>
               ) : (
                 <>
-                  <CalendarPlus size={18} />
+                  <CalendarPlus size={18} strokeWidth={1.75} />
                   I wore this today
                 </>
               )}
@@ -456,9 +484,9 @@ export function ItemDetail() {
                     setBackdateValue(new Date().toISOString().slice(0, 10))
                   }}
                   disabled={busy || !!item.archivedAt}
-                  className="text-xs text-ink-400 hover:text-ink-100 inline-flex items-center gap-1 disabled:opacity-50"
+                  className="text-xs text-tertiary hover:text-ink-50 inline-flex items-center gap-1 disabled:opacity-50"
                 >
-                  <Plus size={12} />
+                  <Plus size={12} strokeWidth={1.75} />
                   Log a past wear
                 </button>
               ) : (
@@ -481,63 +509,92 @@ export function ItemDetail() {
                   <button
                     type="button"
                     onClick={() => setBackdateOpen(false)}
-                    className="p-1.5 rounded-full text-ink-400 hover:text-ink-100"
+                    className="p-1.5 rounded-full text-tertiary hover:text-ink-50"
                     aria-label="Cancel"
                   >
-                    <X size={14} />
+                    <X size={14} strokeWidth={1.75} />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Wear stats */}
-            <div className="mt-6 grid grid-cols-3 gap-3 text-center">
-              <Stat
-                label="Wears"
-                value={String(totalWearCount)}
-                hint={
-                  seedWearCount > 0
-                    ? `${realWearCount} logged · ${seedWearCount} prior`
-                    : undefined
-                }
-              />
-              <Stat
-                label="Last worn"
-                value={
-                  lastRealWornAt
-                    ? relativeDayLabel(lastRealWornAt)
-                    : item.seedAsOf
-                      ? `~${relativeDayLabel(item.seedAsOf)}`
-                      : '—'
-                }
-              />
-              <Stat
-                label="Cost / wear"
-                value={
-                  cpw != null
-                    ? `₹${Math.round(cpw).toLocaleString('en-IN')}`
-                    : '—'
-                }
-              />
-            </div>
+            {/* Metadata grid — only render when at least one field is present */}
+            {(item.category ||
+              item.color ||
+              item.brand ||
+              item.purchasePriceMinor != null ||
+              item.purchasedAt ||
+              item.seedAsOf) && (
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                {item.category && (
+                  <MetadataPill
+                    icon={Tag}
+                    label="Category"
+                    value={item.category}
+                  />
+                )}
+                {item.color && (
+                  <MetadataPill
+                    icon={Palette}
+                    label="Color"
+                    value={item.color}
+                  />
+                )}
+                {item.brand && (
+                  <MetadataPill
+                    icon={Store}
+                    label="Brand"
+                    value={item.brand}
+                  />
+                )}
+                {item.purchasePriceMinor != null && (
+                  <MetadataPill
+                    icon={IndianRupee}
+                    label="Price"
+                    value={`₹${(item.purchasePriceMinor / 100).toLocaleString(
+                      'en-IN',
+                    )}`}
+                    tabular
+                  />
+                )}
+                {item.purchasedAt && (
+                  <MetadataPill
+                    icon={Calendar}
+                    label="Purchased"
+                    value={new Date(item.purchasedAt).toLocaleDateString(
+                      'en-IN',
+                      { dateStyle: 'medium' },
+                    )}
+                    tabular
+                  />
+                )}
+                {item.seedAsOf && !item.purchasedAt && (
+                  <MetadataPill
+                    icon={Calendar}
+                    label="Owned since"
+                    value={new Date(item.seedAsOf).toLocaleDateString('en-IN', {
+                      dateStyle: 'medium',
+                    })}
+                    tabular
+                  />
+                )}
+              </div>
+            )}
 
-            {/* Pre-owned badge */}
+            {/* Pre-owned baseline note */}
             {seedWearCount > 0 && (
-              <div className="mt-4 px-3 py-2.5 rounded-xl bg-ink-800/60 border border-ink-800 text-xs text-ink-300 flex items-center gap-2">
-                <History size={14} className="text-accent" />
+              <div className="mt-4 px-3 py-2.5 rounded-card bg-surface-2 border border-hairline text-xs text-ink-300 flex items-center gap-2">
+                <History size={14} strokeWidth={1.75} className="text-accent" />
                 <span>
                   Pre-Hangr baseline:{' '}
-                  <span className="text-ink-100 font-medium">
+                  <span className="text-ink-50 font-medium tabular-nums">
                     ~{seedWearCount} wears
                   </span>
-                  {item.seedAsOf && (
+                  {realWearCount > 0 && (
                     <>
                       {' '}
-                      since{' '}
-                      <span className="text-ink-100">
-                        {new Date(item.seedAsOf).toLocaleDateString('en-IN', {
-                          dateStyle: 'medium',
-                        })}
+                      <span className="text-tertiary tabular-nums">
+                        + {realWearCount} logged
                       </span>
                     </>
                   )}
@@ -546,75 +603,43 @@ export function ItemDetail() {
               </div>
             )}
 
-            {/* Item metadata */}
-            <dl className="mt-6 space-y-3 text-sm">
-              {item.brand && <Row label="Brand" value={item.brand} />}
-              {item.color && <Row label="Color" value={item.color} />}
-              {item.purchasePriceMinor != null && (
-                <Row
-                  label="Price"
-                  value={`₹${(item.purchasePriceMinor / 100).toLocaleString(
-                    'en-IN',
-                  )}`}
-                />
-              )}
-              {item.purchasedAt && (
-                <Row
-                  label="Purchased"
-                  value={new Date(item.purchasedAt).toLocaleDateString(
-                    'en-IN',
-                    { dateStyle: 'medium' },
-                  )}
-                />
-              )}
-              <Row
-                label="Added"
-                value={new Date(item.createdAt).toLocaleDateString('en-IN', {
-                  dateStyle: 'medium',
-                })}
-              />
-              {item.source && item.source !== 'manual' && (
-                <Row label="Source" value={item.source} />
-              )}
-            </dl>
-
             {/* Wear history */}
             {wears && wears.length > 0 && (
               <div className="mt-8">
-                <h3 className="text-sm font-medium text-ink-100 mb-3">
+                <h3 className="font-display italic text-[15px] text-ink-50 mb-2">
                   Wear history
                 </h3>
-                <ul className="divide-y divide-ink-800">
+                <ul className="divide-y divide-hairline">
                   {wears.slice(0, 20).map((w) => (
                     <li
                       key={w.id}
-                      className="py-2 flex items-center justify-between text-sm"
+                      className="py-2.5 flex items-center justify-between text-sm"
                     >
                       <div>
-                        <div className="text-ink-100">
+                        <div className="text-ink-50">
                           {relativeDayLabel(w.wornAt)}
                           {w.source === 'backdated' && (
-                            <span className="ml-2 text-[10px] text-ink-500">
+                            <span className="ml-2 text-[10px] text-tertiary uppercase tracking-wider">
                               backdated
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-ink-500">
+                        <div className="text-xs text-tertiary tabular-nums">
                           {shortDate(w.wornAt)}
                         </div>
                       </div>
                       <button
                         onClick={() => deleteWear(w.id)}
-                        className="p-1.5 rounded-lg text-ink-500 hover:text-red-400"
+                        className="p-1.5 rounded-full text-tertiary hover:text-danger transition-colors"
                         aria-label="Remove wear"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} strokeWidth={1.75} />
                       </button>
                     </li>
                   ))}
                 </ul>
                 {wears.length > 20 && (
-                  <div className="mt-2 text-xs text-ink-500">
+                  <div className="mt-2 text-xs text-tertiary">
                     + {wears.length - 20} more
                   </div>
                 )}
@@ -635,31 +660,29 @@ export function ItemDetail() {
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function CircleButton({
+  children,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
+  ariaLabel: string
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-      <dt className="text-ink-400">{label}</dt>
-      <dd className="text-ink-100">{value}</dd>
-    </div>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className="w-10 h-10 rounded-full bg-surface-1/90 border border-hairline backdrop-blur-sm text-ink-50 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
+    >
+      {children}
+    </button>
   )
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="rounded-2xl bg-ink-800 border border-ink-800 px-3 py-3">
-      <div className="text-xs text-ink-400">{label}</div>
-      <div className="mt-0.5 text-base font-medium truncate">{value}</div>
-      {hint && (
-        <div className="mt-0.5 text-[10px] text-ink-500 truncate">{hint}</div>
-      )}
-    </div>
-  )
+function Dot() {
+  return <span className="text-hairline">•</span>
 }

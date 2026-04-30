@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
-import { Wand2, ChevronDown, History } from 'lucide-react'
+import { Sparkles, ChevronDown, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface ItemFormValues {
@@ -166,11 +166,7 @@ export function ItemForm({
 
       <Field
         label="Category"
-        suggestion={
-          filledFromDetect.category
-            ? { label: 'auto-detected', icon: <Wand2 size={10} /> }
-            : undefined
-        }
+        autoFilled={filledFromDetect.category}
       >
         <select
           value={category}
@@ -192,16 +188,12 @@ export function ItemForm({
       <div className="grid grid-cols-2 gap-3">
         <Field
           label="Color"
-          suggestion={
-            filledFromDetect.color
-              ? { label: 'auto-detected', icon: <Wand2 size={10} /> }
-              : undefined
-          }
+          autoFilled={filledFromDetect.color}
         >
           <div className="relative">
             {detected?.colorHex && filledFromDetect.color && (
               <span
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full border border-ink-700"
+                className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full border border-hairline"
                 style={{ backgroundColor: detected.colorHex }}
                 aria-hidden
               />
@@ -238,7 +230,7 @@ export function ItemForm({
             inputMode="numeric"
             pattern="[0-9]*"
             placeholder="2499"
-            className="form-input"
+            className="form-input tabular-nums"
           />
         </Field>
         <Field label="Purchased on">
@@ -252,7 +244,7 @@ export function ItemForm({
       </div>
 
       {/* Pre-owned section — collapsed by default for new items */}
-      <div className="rounded-2xl border border-ink-800 bg-ink-900/40">
+      <div className="rounded-card border border-hairline bg-surface-1">
         <button
           type="button"
           onClick={() => {
@@ -264,10 +256,10 @@ export function ItemForm({
           className="w-full flex items-center justify-between px-3 py-3 text-left"
         >
           <div className="flex items-center gap-2">
-            <History size={14} className="text-accent" />
+            <History size={14} className="text-accent" strokeWidth={1.75} />
             <div>
-              <div className="text-sm">I've already owned this</div>
-              <div className="text-xs text-ink-500">
+              <div className="text-sm text-ink-50">I've already owned this</div>
+              <div className="text-xs text-tertiary">
                 {showSeed
                   ? 'Counts past wears toward stats'
                   : 'For items already in rotation before today'}
@@ -276,8 +268,9 @@ export function ItemForm({
           </div>
           <ChevronDown
             size={16}
+            strokeWidth={1.75}
             className={cn(
-              'text-ink-400 transition-transform',
+              'text-ink-300 transition-transform',
               showSeed && 'rotate-180',
             )}
           />
@@ -287,22 +280,32 @@ export function ItemForm({
           <div className="px-3 pb-3 space-y-3">
             <Field label="Roughly how many times worn?">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                {SEED_PRESETS.map((p) => (
-                  <button
-                    type="button"
-                    key={p.label}
-                    onClick={() => setSeedWearCount(String(p.count))}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs border transition',
-                      seedWearCount === String(p.count)
-                        ? 'bg-accent text-ink-950 border-accent'
-                        : 'bg-ink-800 text-ink-300 border-ink-700 hover:text-ink-50',
-                    )}
-                  >
-                    {p.label}{' '}
-                    <span className="opacity-60">~{p.count}</span>
-                  </button>
-                ))}
+                {SEED_PRESETS.map((p) => {
+                  const active = seedWearCount === String(p.count)
+                  return (
+                    <button
+                      type="button"
+                      key={p.label}
+                      onClick={() => setSeedWearCount(String(p.count))}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider border transition-colors',
+                        active
+                          ? 'bg-surface-2 text-accent border-hairline'
+                          : 'bg-surface-1 text-ink-300 border-hairline hover:text-ink-50',
+                      )}
+                    >
+                      {p.label}{' '}
+                      <span
+                        className={cn(
+                          'ml-1 tabular-nums',
+                          active ? 'text-accent/70' : 'text-tertiary',
+                        )}
+                      >
+                        ~{p.count}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
               <input
                 value={seedWearCount}
@@ -312,7 +315,7 @@ export function ItemForm({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="e.g. 25"
-                className="form-input"
+                className="form-input tabular-nums"
               />
             </Field>
 
@@ -325,7 +328,7 @@ export function ItemForm({
               />
             </Field>
 
-            <p className="text-xs text-ink-500 leading-relaxed">
+            <p className="text-xs text-tertiary leading-relaxed">
               These count toward total wears, cost-per-wear, and "most worn"
               stats. Exact values aren't important — a guess is better than
               nothing.
@@ -337,7 +340,7 @@ export function ItemForm({
       <button
         type="submit"
         disabled={disabled || !name.trim()}
-        className="w-full mt-2 px-4 py-3 rounded-2xl bg-accent text-ink-950 font-medium active:scale-[0.99] transition disabled:opacity-40"
+        className="w-full mt-2 h-12 rounded-full bg-accent text-ink-950 font-medium active:scale-[0.99] transition-transform disabled:opacity-40"
       >
         {disabled ? 'Saving…' : (submitLabel ?? 'Save to closet')}
       </button>
@@ -348,25 +351,27 @@ export function ItemForm({
 function Field({
   label,
   required,
-  suggestion,
+  autoFilled,
   children,
 }: {
   label: string
   required?: boolean
-  suggestion?: { label: string; icon?: ReactNode }
+  autoFilled?: boolean
   children: ReactNode
 }) {
   return (
     <label className="block">
-      <span className="flex items-center justify-between text-xs text-ink-400 mb-1">
-        <span>
+      <span className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-300">
           {label}
           {required && <span className="text-accent ml-0.5">*</span>}
         </span>
-        {suggestion && (
-          <span className="inline-flex items-center gap-1 text-accent/80">
-            {suggestion.icon}
-            {suggestion.label}
+        {autoFilled && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2 border border-hairline">
+            <Sparkles size={10} className="text-accent" strokeWidth={2} />
+            <span className="text-[10px] font-semibold tracking-widest text-accent">
+              AUTO
+            </span>
           </span>
         )}
       </span>

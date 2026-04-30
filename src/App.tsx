@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { Closet } from './routes/Closet'
 import { Capture } from './routes/Capture'
 import { BulkCapture } from './routes/BulkCapture'
+import { Wants } from './routes/Wants'
 import { ItemDetail } from './routes/ItemDetail'
 import { Log } from './routes/Log'
 import { Insights } from './routes/Insights'
@@ -21,6 +22,7 @@ function App() {
           <Route path="/closet/:id" element={<ItemDetail />} />
           <Route path="/capture" element={<Capture />} />
           <Route path="/capture/bulk" element={<BulkCapture />} />
+          <Route path="/wants" element={<Wants />} />
           <Route path="/log" element={<Log />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/settings" element={<Settings />} />
