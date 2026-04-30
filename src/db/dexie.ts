@@ -59,6 +59,14 @@ export interface Item {
    * for a pre-owned item.
    */
   seedAsOf?: number
+
+  // ─── Occasions ──────────────────────────────────────────────────────────
+  /**
+   * Free-form occasion tags (Festive, Wedding, Office, etc.) — see
+   * `lib/occasions.ts` for the canonical list. Items can have several;
+   * indexed via Dexie's multiEntry so Closet can filter by any tag.
+   */
+  occasions?: string[]
 }
 
 /** Photos kept separate so the items table stays small for queries. */
@@ -186,6 +194,16 @@ db.version(4).stores({
 // v5 — want list (pre-purchase consideration).
 db.version(5).stores({
   items: 'id, category, archivedAt, createdAt, source',
+  itemPhotos: 'id, itemId, createdAt',
+  wears: 'id, itemId, wornAt, outfitId, createdAt',
+  outfits: 'id, archivedAt, createdAt',
+  dayNotes: '&dayMs, updatedAt',
+  wants: 'id, decision, createdAt, decidedAt',
+})
+// v6 — occasion tags on items. multiEntry index `*occasions` so we can query
+// "items where any tag is X" without scanning everything.
+db.version(6).stores({
+  items: 'id, category, archivedAt, createdAt, source, *occasions',
   itemPhotos: 'id, itemId, createdAt',
   wears: 'id, itemId, wornAt, outfitId, createdAt',
   outfits: 'id, archivedAt, createdAt',

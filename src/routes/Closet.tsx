@@ -9,6 +9,7 @@ import { ItemCard } from '@/components/ItemCard'
 import { EmptyState } from '@/components/EmptyState'
 import { HangerIcon } from '@/components/HangerIcon'
 import { CategoryFilter } from '@/components/CategoryFilter'
+import { cn } from '@/lib/utils'
 
 export function Closet() {
   const navigate = useNavigate()
@@ -16,6 +17,7 @@ export function Closet() {
   const wearStats = useLiveQuery(() => getWearStatsByItem())
   const wantsCount = useLiveQuery(async () => (await listWants()).length)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [activeOccasion, setActiveOccasion] = useState<string | null>(null)
 
   const { categories, counts } = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -26,11 +28,29 @@ export function Closet() {
     return { categories: Object.keys(counts).sort(), counts }
   }, [items])
 
+  const { occasions: occasionList, occasionCounts } = useMemo(() => {
+    const occasionCounts: Record<string, number> = {}
+    if (!items) return { occasions: [] as string[], occasionCounts }
+    for (const i of items) {
+      if (!i.occasions) continue
+      for (const o of i.occasions) {
+        occasionCounts[o] = (occasionCounts[o] ?? 0) + 1
+      }
+    }
+    return {
+      occasions: Object.keys(occasionCounts).sort(),
+      occasionCounts,
+    }
+  }, [items])
+
   const visibleItems = useMemo(() => {
     if (!items) return []
-    if (!activeCategory) return items
-    return items.filter((i) => i.category === activeCategory)
-  }, [items, activeCategory])
+    return items.filter((i) => {
+      if (activeCategory && i.category !== activeCategory) return false
+      if (activeOccasion && !i.occasions?.includes(activeOccasion)) return false
+      return true
+    })
+  }, [items, activeCategory, activeOccasion])
 
   const wearCountFor = (itemId: string, seed = 0) =>
     (wearStats?.get(itemId)?.count ?? 0) + seed
@@ -89,7 +109,7 @@ export function Closet() {
       </header>
 
       {categories.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-3">
           <CategoryFilter
             categories={categories}
             active={activeCategory}
@@ -97,6 +117,52 @@ export function Closet() {
             counts={counts}
             totalCount={items.length}
           />
+        </div>
+      )}
+
+      {/* Secondary occasion filter — only shown if any item is tagged */}
+      {occasionList.length > 0 && (
+        <div className="mb-5 -mx-5 px-5 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 pb-1">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-tertiary pr-1">
+              For
+            </span>
+            <button
+              onClick={() => setActiveOccasion(null)}
+              className={cn(
+                'shrink-0 px-3 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border transition-colors whitespace-nowrap',
+                activeOccasion === null
+                  ? 'bg-surface-2 text-accent border-accent/40'
+                  : 'bg-surface-1 text-ink-300 border-hairline hover:text-ink-50',
+              )}
+            >
+              Any
+            </button>
+            {occasionList.map((o) => (
+              <button
+                key={o}
+                onClick={() =>
+                  setActiveOccasion(activeOccasion === o ? null : o)
+                }
+                className={cn(
+                  'shrink-0 px-3 py-1 rounded-full text-[11px] font-medium uppercase tracking-wider border transition-colors whitespace-nowrap',
+                  activeOccasion === o
+                    ? 'bg-surface-2 text-accent border-accent/40'
+                    : 'bg-surface-1 text-ink-300 border-hairline hover:text-ink-50',
+                )}
+              >
+                {o}
+                <span
+                  className={cn(
+                    'ml-1.5 tabular-nums',
+                    activeOccasion === o ? 'text-accent/70' : 'text-tertiary',
+                  )}
+                >
+                  {occasionCounts[o]}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

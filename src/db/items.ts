@@ -18,6 +18,8 @@ export interface CreateItemInput {
   /** Pre-owned baseline. */
   seedWearCount?: number
   seedAsOf?: number
+  /** Occasion tags — Festive, Wedding, Office, etc. See lib/occasions.ts. */
+  occasions?: string[]
   photo?: {
     blob: Blob
     width: number
@@ -60,6 +62,10 @@ export async function createItem(input: CreateItemInput): Promise<Item> {
       createdAt: now,
       seedWearCount: input.seedWearCount,
       seedAsOf: input.seedAsOf,
+      occasions:
+        input.occasions && input.occasions.length > 0
+          ? input.occasions
+          : undefined,
     }
     await db.items.add(item)
   })

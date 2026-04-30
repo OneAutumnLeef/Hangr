@@ -141,6 +141,7 @@ export function ItemDetail() {
         purchasedAt: values.purchasedAt,
         seedWearCount: values.seedWearCount,
         seedAsOf: values.seedAsOf,
+        occasions: values.occasions,
       })
       setEditing(false)
       toast.success('Item updated')
@@ -412,6 +413,7 @@ export function ItemDetail() {
               purchasedAt: item.purchasedAt,
               seedWearCount: item.seedWearCount,
               seedAsOf: item.seedAsOf,
+              occasions: item.occasions,
             }}
           />
         ) : (

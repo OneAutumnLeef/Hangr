@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { Sparkles, ChevronDown, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { OCCASIONS } from '@/lib/occasions'
 
 export interface ItemFormValues {
   name: string
@@ -20,6 +21,8 @@ export interface ItemFormValues {
   seedWearCount?: number
   /** "Owned since" — when the seed period began. */
   seedAsOf?: number
+  /** Occasion tags — Festive, Wedding, Office, etc. */
+  occasions?: string[]
 }
 
 export interface DetectedFields {
@@ -100,6 +103,18 @@ export function ItemForm({
       ? new Date(initial.seedAsOf).toISOString().slice(0, 10)
       : '',
   )
+  const [occasions, setOccasions] = useState<Set<string>>(
+    () => new Set(initial?.occasions ?? []),
+  )
+
+  function toggleOccasion(o: string) {
+    setOccasions((prev) => {
+      const next = new Set(prev)
+      if (next.has(o)) next.delete(o)
+      else next.add(o)
+      return next
+    })
+  }
 
   // One-time apply of detection results: when `detected` first becomes
   // non-empty, fill any empty fields. We never overwrite existing user input.
@@ -148,6 +163,7 @@ export function ItemForm({
         seedCount != null && seedCount > 0 ? seedCount : undefined,
       seedAsOf:
         showSeed && seedAsOf ? new Date(seedAsOf).getTime() : undefined,
+      occasions: occasions.size > 0 ? Array.from(occasions) : undefined,
     })
   }
 
@@ -242,6 +258,30 @@ export function ItemForm({
           />
         </Field>
       </div>
+
+      {/* Occasion tags — multi-select chip row */}
+      <Field label="Occasions">
+        <div className="flex flex-wrap gap-2">
+          {OCCASIONS.map((o) => {
+            const active = occasions.has(o)
+            return (
+              <button
+                type="button"
+                key={o}
+                onClick={() => toggleOccasion(o)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider border transition-colors',
+                  active
+                    ? 'bg-surface-2 text-accent border-accent/40'
+                    : 'bg-surface-1 text-ink-300 border-hairline hover:text-ink-50',
+                )}
+              >
+                {o}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
 
       {/* Pre-owned section — collapsed by default for new items */}
       <div className="rounded-card border border-hairline bg-surface-1">

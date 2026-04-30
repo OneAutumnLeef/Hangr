@@ -254,6 +254,7 @@ export function Capture() {
         purchasedAt: values.purchasedAt,
         seedWearCount: values.seedWearCount,
         seedAsOf: values.seedAsOf,
+        occasions: values.occasions,
         photo: {
           blob: photoSource.blob,
           width: photoSource.width,
