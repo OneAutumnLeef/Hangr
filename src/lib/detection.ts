@@ -272,12 +272,10 @@ export async function detectCategory(
     )
     onProgress?.({ stage: 'classifying' })
     const labels = FLAT_PROMPTS.map((p) => p.prompt)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = (await withTimeout(
-      classifier(url, labels),
+      classifier(url, labels) as Promise<unknown>,
       30_000,
       'Classification',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     )) as Array<{ label: string; score: number }>
     if (!Array.isArray(result) || result.length === 0) return undefined
     // Sum scores per category (a category may have multiple prompts)

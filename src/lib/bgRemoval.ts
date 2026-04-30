@@ -137,14 +137,17 @@ export async function removeBackground(
       'Image decode',
     )
 
-    const { pixel_values } = await withTimeout(
-      processor(image),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const preproc = (await withTimeout(
+      processor(image) as Promise<unknown>,
       15_000,
       'Image preprocessing',
-    )
+    )) as any
+    const { pixel_values } = preproc
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawOutput = (await withTimeout(
-      model({ input: pixel_values }),
+      model({ input: pixel_values }) as Promise<unknown>,
       45_000,
       'Inference',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
