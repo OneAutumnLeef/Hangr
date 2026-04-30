@@ -29,7 +29,7 @@ Production: deployed via Vercel from `main`. URL in user's Vercel dashboard.
 |---|---|---|
 | Bundler | **Vite 5** | Fast HMR, ESM-first, no SSR overhead |
 | Framework | **React 18 + TypeScript (strict)** | `noUnusedLocals` and `noUnusedParameters` are ON |
-| Styling | **Tailwind CSS** | Dark theme. Lime (`#a3e635`) accent on near-black (`ink-950 = #050505`) |
+| Styling | **Tailwind CSS** | Dark theme. Lime (`#a3e635`) accent on near-black (`#050505`). Editorial pairing: **Fraunces** for display headings + italic section heads, **Inter** for body / UI / tabular ₹. Surface tokens: `surface-1` `#0e0e0f`, `surface-2` `#16161a`, `border-hairline` `#26262a`, `text-tertiary` `#6b6b6b`. Custom radii: `rounded-card` (14px), `rounded-sheet` (22px). Legacy `ink-*` scale kept for backward compat — migrate to surface tokens when touching components. |
 | State (UI) | **Zustand** + persist | Toast queue, preferences |
 | State (server) | **TanStack Query** | Used sparingly — Dexie's `useLiveQuery` handles most reactive reads |
 | Local DB | **Dexie (IndexedDB)** | Items, item photos (Blobs), wears |
@@ -52,46 +52,65 @@ Hangr/
 │   └── icon.png                 # Source for all PWA icons (generated via npm run generate-pwa-assets)
 ├── src/
 │   ├── components/
-│   │   ├── ArchiveDialog.tsx    # Reason picker when archiving an item
-│   │   ├── CategoryFilter.tsx   # Horizontal scrollable chip row
-│   │   ├── DiagnosticsView.tsx  # Settings → Diagnostics log feed
+│   │   ├── ArchiveDialog.tsx          # Reason picker when archiving an item
+│   │   ├── CalendarBackdateSheet.tsx  # 35-day grid for backdate flow on Log
+│   │   ├── CategoryFilter.tsx         # Horizontal scrollable chip row (with `scrollbar-none` utility)
+│   │   ├── DayNoteSheet.tsx           # Edit per-day diary note ("Wore to Sneha's wedding")
+│   │   ├── DiagnosticsView.tsx        # Settings → Diagnostics log feed
 │   │   ├── EmptyState.tsx
-│   │   ├── ErrorBoundary.tsx    # App-wide; surfaces errors instead of blank screen
-│   │   ├── HangerIcon.tsx       # Wordmark glyph
-│   │   ├── InstallPrompt.tsx    # Cross-platform A2HS prompt
-│   │   ├── ItemCard.tsx         # Closet grid card
-│   │   ├── ItemForm.tsx         # Capture + edit. Includes "Already owned" pre-owned section
-│   │   ├── ItemPickerSheet.tsx  # Multi-select item picker (used by Log)
-│   │   ├── ItemRowMini.tsx      # Insights leaderboard row
-│   │   ├── Layout.tsx           # Tab-bar shell; safe-area top padding
-│   │   ├── MiniItemThumb.tsx    # Small square photo
-│   │   ├── Sheet.tsx            # Bottom-sheet primitive
+│   │   ├── ErrorBoundary.tsx          # App-wide; surfaces errors instead of blank screen
+│   │   ├── HangerIcon.tsx             # Wordmark glyph
+│   │   ├── InstallPrompt.tsx          # Cross-platform A2HS prompt
+│   │   ├── ItemCard.tsx               # Closet grid card
+│   │   ├── ItemForm.tsx               # Capture + edit. Pre-owned section + occasion multi-select
+│   │   ├── ItemPairRow.tsx            # Insights "Forgotten pairs" row — overlapping thumb pair
+│   │   ├── ItemPickerSheet.tsx        # Multi-select item picker (Log)
+│   │   ├── ItemRowMini.tsx            # Insights leaderboard row
+│   │   ├── Layout.tsx                 # Capsule TabBar shell; safe-area top padding
+│   │   ├── MetadataPill.tsx           # ItemDetail metadata 2x2 pill
+│   │   ├── MiniItemThumb.tsx          # Small square photo
+│   │   ├── OutfitChip.tsx             # Saved-outfit rail card (2x2 grid of thumbs)
+│   │   ├── OutfitDetailSheet.tsx      # Outfit preview + Wear today / Edit / Delete
+│   │   ├── OutfitEditorSheet.tsx      # Create/edit outfit (name + multi-select grid)
+│   │   ├── Sheet.tsx                  # Bottom-sheet primitive — calls useOverlay() to fade TabBar
 │   │   ├── StatTile.tsx
-│   │   ├── TabBar.tsx           # 5 tabs: Closet, Add, Log, Insights, Settings
+│   │   ├── TabBar.tsx                 # Floating capsule pill: 4 tabs (Closet/Log/Insights/Settings) + centred Add FAB; fades when overlayCount > 0
 │   │   ├── Toaster.tsx
-│   │   └── WearTrendChart.tsx   # Dependency-free SVG bar chart (12-week)
+│   │   ├── WantEditorSheet.tsx        # Add/edit a "considering buying" item with live inventory cross-check
+│   │   └── WearTrendChart.tsx         # Dependency-free SVG bar chart (12-week, tap-to-reveal count, dashed average line)
 │   ├── db/
-│   │   ├── dexie.ts             # Schema (v2). Item, ItemPhoto, Wear interfaces
+│   │   ├── dayNotes.ts          # getDayNote / setDayNote / listDayNotes (per-day diary)
+│   │   ├── dexie.ts             # Schema (v7). Item, ItemPhoto, Wear, Outfit, DayNote, Want, ItemEmbedding
 │   │   ├── items.ts             # Item CRUD + photo helpers
-│   │   └── wears.ts             # Wear logging, queries, aggregations
+│   │   ├── outfits.ts           # createOutfit / listOutfits / archiveOutfit / etc.
+│   │   ├── wants.ts             # createWant / listWants / decideWant (bought/passed)
+│   │   └── wears.ts             # Wear logging, queries, aggregations, logSavedOutfit
 │   ├── lib/
-│   │   ├── analytics.ts         # loadAllAnalytics() — single-pass aggregation. Includes seedWearCount in totals
+│   │   ├── analytics.ts         # loadAllAnalytics() — single-pass aggregation. Includes buyersRegret, topWornColors, dormantPairs, inventoryForCategory
 │   │   ├── bgRemoval.ts         # transformers.js + RMBG-1.4. Forces WASM on iOS
+│   │   ├── colors.ts            # Color name → hex (named palette + hash fallback)
 │   │   ├── dataExport.ts        # JSON export, deleteAll, storage estimate
 │   │   ├── dates.ts             # startOfDay etc.
 │   │   ├── detection.ts         # CLIP zero-shot category + JS-only color extractor
 │   │   ├── diagnostics.ts       # In-app logger. Patches console + window error events. Persists to localStorage
+│   │   ├── embeddings.ts        # CLIP image-feature pipeline + cosine similarity for duplicate detection
+│   │   ├── occasions.ts         # OCCASIONS const (Casual/Office/Festive/Wedding/Travel/...)
 │   │   ├── photo.ts             # processPhoto() resizes to 1600px JPEG, returns Blob + url
 │   │   ├── preferences.ts       # Zustand persist store. mlEnabled toggle. Exports `isIOS`
+│   │   ├── seedData.ts          # DEV ONLY — example wardrobe seeder, fillMissingPhotos, backfillEmbeddings
+│   │   ├── shell.ts             # useShell zustand + useOverlay() hook (fades TabBar when sheets are open)
 │   │   ├── toast.ts             # toast.success/error/info
-│   │   └── utils.ts             # cn(), makeId()
+│   │   ├── utils.ts             # cn(), makeId()
+│   │   └── wrapped.ts           # Year-in-clothes recap PNG renderer (Canvas 2D, 1080×1920)
 │   ├── routes/
-│   │   ├── Capture.tsx          # Photo → bg removal → detection → form → save
-│   │   ├── Closet.tsx           # Grid + category filter
-│   │   ├── Insights.tsx         # Honesty report — stats, trend, leaderboards, dormant
+│   │   ├── BulkCapture.tsx      # Gallery batch — pick up to 30, sequential ML pipeline, save together
+│   │   ├── Capture.tsx          # Photo → bg removal → detection → duplicate check → form → save
+│   │   ├── Closet.tsx           # Grid + category filter + occasion filter rail + Want list link
+│   │   ├── Insights.tsx         # Honesty report — stats, trend, regret, donations, forgotten pairs, palettes, dormant
 │   │   ├── ItemDetail.tsx       # Read view + edit mode + wear stats + wear history + backdate UI
-│   │   ├── Log.tsx              # Today's outfit + recent days
-│   │   └── Settings.tsx         # Privacy, ML toggle, storage, data export, delete-all, diagnostics, about
+│   │   ├── Log.tsx              # Yesterday prompt + Today's hero + saved-outfits rail + recent days expand + day notes + calendar backdate
+│   │   ├── Settings.tsx         # Privacy, ML toggle, storage, Wrapped, export, delete, diagnostics, dev seeders
+│   │   └── Wants.tsx            # Want list — pre-purchase consideration with inventory cross-check
 │   ├── App.tsx
 │   ├── main.tsx                 # installDiagnostics() runs before render
 │   ├── index.css                # @tailwind + form-input component class
@@ -106,7 +125,7 @@ Hangr/
 
 ---
 
-## Data model (Dexie v2)
+## Data model (Dexie v7)
 
 ```ts
 // src/db/dexie.ts
@@ -129,6 +148,10 @@ interface Item {
   // Pre-owned baseline — counts past wears toward stats
   seedWearCount?: number
   seedAsOf?: number             // when those seed wears began
+
+  // Occasion tags (v6) — multiEntry indexed via `*occasions` so Closet
+  // can filter by any tag. See lib/occasions.ts for the canonical list.
+  occasions?: string[]
 }
 
 interface ItemPhoto {
@@ -146,13 +169,60 @@ interface Wear {
   itemId: string
   wornAt: number                // start-of-day ms in user's local TZ
   source: 'manual' | 'selfie' | 'inferred' | 'backdated'
+  // When the wear was logged via a saved Outfit, this holds that outfit's id —
+  // lets analytics ask "how often is this outfit worn".
   outfitId?: string
+  createdAt: number
+}
+
+// v3 — saved outfit definitions (one-tap logging)
+interface Outfit {
+  id: string
+  name: string
+  itemIds: string[]             // ordered, refers to items.id (may include archived)
+  createdAt: number
+  updatedAt: number
+  archivedAt?: number           // soft delete
+}
+
+// v4 — per-day diary note ("Wore this to Sneha's wedding"). Keyed by dayMs
+// so it survives even when every wear from that day is removed.
+interface DayNote {
+  dayMs: number                 // primary key — start-of-day in local TZ
+  note: string
+  updatedAt: number
+}
+
+// v5 — pre-purchase consideration. Lets the inventory cross-check land
+// before money is spent. Decisions ('bought'|'passed') stay for the record.
+interface Want {
+  id: string
+  name: string
+  category?: string
+  color?: string
+  brand?: string
+  estimatedPriceMinor?: number
+  source?: string               // URL / store / "Insta ad"
+  note?: string                 // why they want it
+  createdAt: number
+  decision?: 'bought' | 'passed'
+  decidedAt?: number
+}
+
+// v7 — CLIP image embedding for visual duplicate detection at capture time
+interface ItemEmbedding {
+  itemId: string                // primary key, FK → items.id
+  embedding: Float32Array       // 512-dim, L2-normalized
+  model: string                 // 'Xenova/clip-vit-base-patch32'
   createdAt: number
 }
 ```
 
-**Always go through helpers** in `src/db/items.ts` and `src/db/wears.ts`. Don't
-poke `db.items` directly from components.
+Migrations are append-only — every `db.version()` call stays declared so
+existing user databases auto-upgrade. v6 added `*occasions` multiEntry index.
+
+**Always go through helpers** in `src/db/{items,wears,outfits,dayNotes,wants}.ts`.
+Don't poke `db.<table>` directly from components.
 
 ---
 
@@ -176,27 +246,56 @@ poke `db.items` directly from components.
 
 ## Status (as of last session)
 
-**Completed: v0.1 → v0.5 + extras.**
+**Completed: v0.1 → v0.8 + design refresh.**
 
+v0.1–v0.5 foundation:
 - ✅ PWA shell, install prompt, offline-capable
 - ✅ Capture: photo → bg removal (RMBG-1.4) → auto-detect category (CLIP) + color → form → save
 - ✅ Closet grid + category filter + item detail (edit / archive with reason / replace photo)
-- ✅ Pre-owned items: seedWearCount + seedAsOf, integrated into analytics
-- ✅ Backdate wear (date picker on item detail)
-- ✅ Wear logging: Today's outfit, recent days, item picker sheet
-- ✅ Insights: stats, 12-week trend chart, most-worn / best-CPW / worst-CPW / dormant / by-category
-- ✅ Settings: privacy info, ML toggle, storage usage, JSON export, delete-all, build timestamp, diagnostics feed
-- ✅ Toast system, error boundary, in-app diagnostic logger
-- ✅ iOS-specific: ML toggle defaults OFF on iOS, force WASM device (WebGPU on iOS Safari 18 crashes silently)
+- ✅ Pre-owned baseline (seedWearCount + seedAsOf), backdate wear, wear logging (today + recent days)
+- ✅ Insights v1: stats, 12-week trend, most-worn / best-CPW / worst-CPW / dormant / by-category
+- ✅ Settings: privacy, ML toggle, storage, export, delete-all, diagnostics
+- ✅ iOS-specific: ML toggle defaults OFF on iOS, WASM forced (WebGPU silently crashes RMBG on Safari 18)
+
+v0.6 — bulk capture:
+- ✅ Gallery batch picker (up to 30), sequential ML pipeline per item, single review pass, batch save
+
+v0.7 — saved outfits:
+- ✅ `outfits` table (Dexie v3), Log rail with 2x2 thumb chips, detail sheet (Wear today / Edit / Delete)
+- ✅ Wears logged via a saved outfit carry `outfitId = savedOutfit.id` → future analytics knows "how often is this outfit worn"
+
+Design refresh:
+- ✅ Editorial dark UI: Fraunces + Inter via Google Fonts, surface tokens, hairlines, rounded-card/sheet
+- ✅ Floating capsule TabBar with 4 tabs + centred Add FAB (replaced the flat 5-tab bar)
+- ✅ `useOverlay()` shell pattern: any sheet pushes a counter, TabBar fades when > 0 (so sheet footers aren't covered)
+- ✅ `scrollbar-none` utility for chip rails
+
+v0.8 — analytics depth + shopping conscience:
+- ✅ **Buyer's regret** — bought in last 90 days, never worn (Insights)
+- ✅ **Worn colours** — palette weighted by wears, with swatches (Insights, uses `lib/colors.ts`)
+- ✅ **Forgotten pairs** — items co-worn ≥3 times, dormant 60d+ (Insights, `computeDormantPairs`)
+- ✅ **Worth letting go?** — donation review: priced items unworn 6mo+ with ₹ tied up
+- ✅ **Auto save-this-combo** — suggest saving as outfit after 3+ items logged same day
+- ✅ **Yesterday's outfit?** — backfill prompt on Log when yesterday is empty
+- ✅ **Day diary notes** — per-day text notes (DayNote table v4), shown in today's hero + recent-day expand
+- ✅ **Want list** — `/wants` route, live inventory cross-check ("you already own 4 tops"), Bought/Pass actions (Want table v5)
+- ✅ **Occasion tags** — Casual/Office/Festive/Wedding/Travel/Sport/Lounge/Formal, multiEntry indexed (v6), filter rail on Closet
+- ✅ **Calendar-grid backdate** — 35-day grid sheet from Log header, taps any day to log/backfill
+- ✅ **Visual duplicate detection** — CLIP image embeddings (v7), warns at capture if a similar item already exists (cosine ≥ 0.88)
+- ✅ **Year in clothes** — Wrapped recap: 1080×1920 PNG with hero photo, top stats, top colour swatch (Settings → Year in clothes)
 
 **Roadmap (not built):**
 
-- ⏳ v0.6 — Bulk capture (queue gallery picker), or Gmail receipt import, or saved outfits — tbd by user signal
-- ⏳ v0.7 — Vibe-based outfit suggestions (CLIP embeddings on items, ranking by vibe prompt)
-- ⏳ v0.8 — Selfie auto-log (mirror selfie → CLIP match → log wear)
+- ⏳ Vibe-based outfit suggestions (CLIP embeddings already exist — v7 — for ranking)
+- ⏳ Selfie auto-log (mirror selfie → CLIP match → log wear)
+- ⏳ Gmail receipt import (deferred per user — privacy-first OAuth flow)
 - ⏳ HEIC handling improvements (iOS gallery delivers HEIC; canvas decode is brittle)
 - ⏳ Code-split transformers.js (currently in main bundle)
-- ⏳ Optional cloud sync with E2E encryption (only if user explicitly wants it)
+- ⏳ Optional cloud sync with E2E encryption (only if explicitly requested)
+
+**Researched, NOT viable:**
+
+- ❌ **Daily-log push notifications.** Real scheduled push requires a backend (VAPID) which violates the privacy-first commitment. `Notification Triggers` was a Chrome origin trial that never shipped. `periodicSync` is Chrome-Android-only on installed PWAs and unreliable. The in-app "Yesterday's outfit?" prompt covers the same job-to-be-done when the user opens Hangr — keep that as the substitute.
 
 ---
 
