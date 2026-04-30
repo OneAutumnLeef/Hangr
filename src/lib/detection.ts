@@ -240,20 +240,45 @@ export async function ensureClassifierLoaded(
   return classifierPromise
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms,
+    )
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
+
 export async function detectCategory(
   blob: Blob,
   onProgress?: (p: CategoryDetectionProgress) => void,
 ): Promise<{ label: string; score: number } | undefined> {
   const url = URL.createObjectURL(blob)
   try {
-    const classifier = await ensureClassifierLoaded(onProgress)
+    const classifier = await withTimeout(
+      ensureClassifierLoaded(onProgress),
+      90_000,
+      'Classifier load',
+    )
     onProgress?.({ stage: 'classifying' })
     const labels = FLAT_PROMPTS.map((p) => p.prompt)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = (await classifier(url, labels)) as Array<{
-      label: string
-      score: number
-    }>
+    const result = (await withTimeout(
+      classifier(url, labels),
+      30_000,
+      'Classification',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    )) as Array<{ label: string; score: number }>
     if (!Array.isArray(result) || result.length === 0) return undefined
     // Sum scores per category (a category may have multiple prompts)
     const totals = new Map<string, number>()

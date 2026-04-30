@@ -6,6 +6,7 @@ import {
   Sparkles,
   Loader2,
   Wand2,
+  X,
 } from 'lucide-react'
 import { processPhoto, type ProcessedPhoto } from '@/lib/photo'
 import { removeBackground, type BgRemovalProgress } from '@/lib/bgRemoval'
@@ -50,6 +51,24 @@ export function Capture() {
   const [detected, setDetected] = useState<DetectedSuggestions | null>(null)
   const [detectionError, setDetectionError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [elapsedSec, setElapsedSec] = useState(0)
+
+  // Each capture (or "Skip") bumps this — any stale ML callbacks check it
+  // and bail if their session id no longer matches.
+  const sessionIdRef = useRef(0)
+
+  // Tick the elapsed-time counter while ML is running
+  useEffect(() => {
+    if (!removing && !detecting) {
+      setElapsedSec(0)
+      return
+    }
+    const start = Date.now()
+    const interval = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - start) / 1000))
+    }, 250)
+    return () => clearInterval(interval)
+  }, [removing, detecting])
 
   // Cleanup any object URLs when unmounting
   useEffect(() => {
@@ -63,6 +82,7 @@ export function Capture() {
   function clearVariants() {
     if (variants?.original) URL.revokeObjectURL(variants.original.url)
     if (variants?.cutout) URL.revokeObjectURL(variants.cutout.url)
+    sessionIdRef.current += 1 // invalidate any in-flight ML
     setVariants(null)
     setShowVariant('cutout')
     setError(null)
@@ -71,6 +91,24 @@ export function Capture() {
     setDetected(null)
     setDetecting(false)
     setDetectionError(null)
+  }
+
+  /** User taps "Skip" — drop ML, keep the original photo, show the form. */
+  function handleSkipML() {
+    sessionIdRef.current += 1
+    setRemoving(false)
+    setDetecting(false)
+    setRemovalProgress(null)
+    setShowVariant('original')
+    setVariants((prev) =>
+      prev
+        ? {
+            ...prev,
+            cutoutFailed: prev.cutoutFailed ?? !prev.cutout,
+            cutoutError: prev.cutoutError ?? 'Skipped on this device',
+          }
+        : prev,
+    )
   }
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
@@ -92,6 +130,8 @@ export function Capture() {
   }
 
   async function runPipeline(original: ProcessedPhoto) {
+    const mySession = ++sessionIdRef.current
+
     // Start CLIP model preload in parallel with bg removal — both will be
     // cached after first run.
     const classifierPreload = ensureClassifierLoaded().catch((err) => {
@@ -102,9 +142,11 @@ export function Capture() {
     setRemoving(true)
     let cutout: ProcessedPhoto | undefined
     try {
-      const result = await removeBackground(original.blob, (p) =>
-        setRemovalProgress(p),
-      )
+      const result = await removeBackground(original.blob, (p) => {
+        if (sessionIdRef.current !== mySession) return
+        setRemovalProgress(p)
+      })
+      if (sessionIdRef.current !== mySession) return // user skipped or retook
       const url = URL.createObjectURL(result.blob)
       cutout = {
         blob: result.blob,
@@ -112,23 +154,24 @@ export function Capture() {
         height: result.height,
         url,
       }
-      setVariants((prev) =>
-        prev ? { ...prev, cutout: cutout! } : prev,
-      )
+      setVariants((prev) => (prev ? { ...prev, cutout: cutout! } : prev))
       setShowVariant('cutout')
     } catch (err) {
+      if (sessionIdRef.current !== mySession) return
       console.error('Background removal failed:', err)
       const message = err instanceof Error ? err.message : String(err)
       setVariants((prev) =>
-        prev
-          ? { ...prev, cutoutFailed: true, cutoutError: message }
-          : prev,
+        prev ? { ...prev, cutoutFailed: true, cutoutError: message } : prev,
       )
       setShowVariant('original')
     } finally {
-      setRemoving(false)
-      setRemovalProgress(null)
+      if (sessionIdRef.current === mySession) {
+        setRemoving(false)
+        setRemovalProgress(null)
+      }
     }
+
+    if (sessionIdRef.current !== mySession) return
 
     // Detection runs on cutout if available, original otherwise
     setDetecting(true)
@@ -148,12 +191,12 @@ export function Capture() {
           return undefined
         }),
       ])
+      if (sessionIdRef.current !== mySession) return
       setDetected({
         category: categoryResult?.label,
         color: colorResult?.name,
         colorHex: colorResult?.hex,
       })
-      // Surface a category-detection failure (color is reliable; category uses CLIP).
       if (!categoryResult && categoryErr) {
         const msg =
           categoryErr instanceof Error
@@ -162,7 +205,9 @@ export function Capture() {
         setDetectionError(msg)
       }
     } finally {
-      setDetecting(false)
+      if (sessionIdRef.current === mySession) {
+        setDetecting(false)
+      }
     }
   }
 
@@ -314,6 +359,17 @@ export function Capture() {
                     </div>
                   </>
                 )}
+                <div className="mt-3 text-[10px] text-ink-400 tabular-nums">
+                  {elapsedSec}s elapsed
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSkipML}
+                  className="mt-4 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-ink-800 border border-ink-700 text-xs text-ink-200 active:scale-95 transition"
+                >
+                  <X size={12} />
+                  Skip — use original
+                </button>
               </div>
             )}
           </div>
@@ -364,18 +420,32 @@ export function Capture() {
 
           {/* Auto-detection banner */}
           {(detecting || detected) && (
-            <div className="flex items-center gap-2 text-xs text-ink-300">
+            <div className="flex items-center justify-between gap-2 text-xs text-ink-300">
               {detecting ? (
-                <>
+                <div className="flex items-center gap-2">
                   <Loader2 size={12} className="animate-spin text-accent" />
-                  <span>Auto-detecting category & color…</span>
-                </>
+                  <span>
+                    Auto-detecting category & color…{' '}
+                    <span className="tabular-nums text-ink-500">
+                      {elapsedSec}s
+                    </span>
+                  </span>
+                </div>
               ) : detected && (detected.category || detected.color) ? (
-                <>
+                <div className="flex items-center gap-2">
                   <Wand2 size={12} className="text-accent" />
                   <span>Auto-filled below — edit if wrong.</span>
-                </>
+                </div>
               ) : null}
+              {detecting && (
+                <button
+                  type="button"
+                  onClick={handleSkipML}
+                  className="text-ink-400 hover:text-ink-100"
+                >
+                  Skip
+                </button>
+              )}
             </div>
           )}
 

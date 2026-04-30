@@ -89,14 +89,41 @@ export async function ensureModelLoaded(
   await modelPromise
 }
 
+/** Reject after `ms` if `p` hasn't settled. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms,
+    )
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
+
 /**
  * Remove the background from an image blob. Returns a PNG blob with transparency.
+ *
+ * Wrapped in a 90s timeout so iOS Safari can't hang the capture screen forever
+ * when transformers.js or the model CDN stalls without throwing.
  */
 export async function removeBackground(
   inputBlob: Blob,
   onProgress?: (p: BgRemovalProgress) => void,
 ): Promise<{ blob: Blob; width: number; height: number }> {
-  await ensureModelLoaded(onProgress)
+  await withTimeout(
+    ensureModelLoaded(onProgress),
+    90_000,
+    'Background-removal model load',
+  )
   if (!modelPromise) throw new Error('Model failed to load')
   const { model, processor } = await modelPromise
 
@@ -104,11 +131,24 @@ export async function removeBackground(
 
   const url = URL.createObjectURL(inputBlob)
   try {
-    const image = await RawImage.fromURL(url)
+    const image = await withTimeout(
+      RawImage.fromURL(url),
+      15_000,
+      'Image decode',
+    )
 
-    const { pixel_values } = await processor(image)
+    const { pixel_values } = await withTimeout(
+      processor(image),
+      15_000,
+      'Image preprocessing',
+    )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawOutput = (await model({ input: pixel_values })) as any
+    const rawOutput = (await withTimeout(
+      model({ input: pixel_values }),
+      45_000,
+      'Inference',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    )) as any
 
     // Different transformers.js versions wrap the result differently.
     // Try every shape we've seen in the wild before giving up.
