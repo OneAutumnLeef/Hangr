@@ -1,140 +1,187 @@
 # Hangr
 
-A privacy-first wardrobe tracker. Photograph clothes once, see what you actually wear.
+**A privacy-first wardrobe tracker.** Photograph clothes once, log when you wear them, see what you actually reach for.
 
-All data stays on your device. No cloud, no telemetry, no account.
+All data lives in your browser. No cloud, no telemetry, no account.
+
+> Live: **[derajyojith.dev/Hangr](https://derajyojith.dev/Hangr)**
 
 ---
 
-## What you can do today (v0.5 MVP)
+## What it does
 
-- **Capture** — take a photo or pick from gallery → background removal runs in your browser → fill the form → save.
-- **Closet** — grid of all your items, filter by category.
-- **Item detail** — wear stats (count, last worn, cost-per-wear), edit, archive, replace photo, full wear history.
-- **Log** — log today's outfit, see recent days at a glance.
-- **Insights** — total spent, total wears, weekly trend chart, most-worn, best/worst cost-per-wear, dormant items, by-category breakdown.
-- **Settings** — privacy info, storage usage, export everything as JSON, delete all data.
+**Logging is one tap.** Open Hangr, tap the items you wore today, done. Saved outfits collapse a regular combo (say, "Friday casual") into a single tap.
+
+**Capture happens on-device.** Snap a photo, the background gets removed in your browser via a quantized RMBG-1.4 model, CLIP picks the category and a JS palette extractor picks the color. The form is pre-filled. Save.
+
+**Insights tell the truth.** Cost-per-wear, total spent, the items you bought 90 days ago and never wore (buyer's regret), the items you haven't touched in 6 months but paid real money for (worth letting go?), the combos you used to wear together but haven't in months (forgotten pairs), the colours you actually reach for vs the ones you own.
+
+**Shopping conscience.** A `/wants` list with an inline inventory check — add a "considering buying" item, see how many similar pieces you already own, their average cost-per-wear, how many are dormant. The pause before purchase is the feature.
+
+**Visual duplicate detection.** Each item gets a CLIP embedding stored locally. New captures are compared against existing items at cosine ≥ 0.88 — "you may already own this — looks similar to *Navy Linen Shirt*." Doesn't block the save; just makes you think twice.
+
+**Year in clothes.** End-of-year recap rendered as a single 1080×1920 PNG: most-worn item with photo, top colour, total wears, average ₹/wear, items added, dormant count. Generated client-side; nothing leaves the device unless you share the image.
+
+**Indian context first.** Currency is ₹ throughout. Categories include *Ethnic* (Kurta, Saree, Salwar, Sherwani). Occasion tags include *Festive* and *Wedding* as first-class citizens. Date format is en-IN.
+
+---
+
+## Privacy model
+
+This is the core architectural commitment, not marketing copy.
+
+- **Photos** are stored as `Blob`s in IndexedDB on your device. Never uploaded.
+- **ML models** (RMBG-1.4 for background removal, CLIP-base for category + image embeddings) run in your browser via WebGPU/WASM. Photos never leave the device for inference.
+- **Analytics** — none. No third-party scripts. Open the network tab; you'll see only your own assets and one model download from `huggingface.co` on first use.
+- **Backend** — there isn't one. Hangr is a static SPA + your browser + IndexedDB.
+
+If cloud sync is ever added, it will be opt-in and end-to-end encrypted. The default will always be device-only.
+
+---
 
 ## Stack
 
-- **Vite + React + TypeScript** — fast HMR, ESM-first, no SSR overhead
-- **Tailwind CSS** — utility styling, dark theme
-- **Dexie (IndexedDB)** — local data layer for items, photos, wears
-- **vite-plugin-pwa** — manifest, service worker, offline shell, install prompt
-- **Zustand** — toast store + (future) UI state
-- **TanStack Query** — async state for non-Dexie reads
-- **Lucide React** — icons
-- **@huggingface/transformers (transformers.js v3)** — in-browser ML; runs RMBG-1.4 on WebGPU/WASM for background removal
+| Layer | Choice |
+|---|---|
+| Framework | React 18 + TypeScript (strict mode) |
+| Bundler | Vite 5 |
+| Styling | Tailwind CSS — Fraunces (display) + Inter (body), surface tokens, hairline borders, dark mode only |
+| Local DB | Dexie (IndexedDB) — items, photos, wears, outfits, day notes, wants, embeddings |
+| State | Zustand for UI, TanStack Query for stray async, `dexie-react-hooks` for live data |
+| PWA | vite-plugin-pwa + Workbox; offline-capable, install-to-home-screen |
+| In-browser ML | `@huggingface/transformers` v3 — RMBG-1.4 + CLIP-base |
+| Routing | react-router-dom v6 |
+| Icons | lucide-react |
+
+---
 
 ## Getting started
 
 ```bash
 npm install
 
-# One-time: generates pwa-192x192.png, pwa-512x512.png, maskable, apple-touch, favicon
-# from public/icon.png
+# One-time: regenerate PWA icons from public/icon.png
 npm run generate-pwa-assets
 
-# Dev server (also exposed on LAN so you can open it on your phone)
+# Dev server (also exposed on LAN so you can test on your phone)
 npm run dev
 ```
 
-Open `http://localhost:5173` on your laptop, or the LAN URL Vite prints (e.g. `http://192.168.x.x:5173`) on your phone.
+`http://localhost:5173` on your laptop, or the LAN URL Vite prints (e.g. `http://192.168.x.x:5173`) on your phone.
 
-> **First-time background removal** downloads a ~150MB model from Hugging Face. Subsequent runs are instant — the model is cached in IndexedDB by transformers.js.
+> **First-time background removal** downloads a ~150 MB model from Hugging Face. Subsequent runs are instant — the model is cached in IndexedDB by transformers.js.
+>
+> **iOS note** — On-device ML defaults OFF on iOS because RMBG (~150 MB) + CLIP (~80 MB) can push older iPhones close to Safari's tab-memory limit. Toggle it on in Settings if your device handles it.
 
-## Build
+### Build
 
 ```bash
-npm run build
-npm run preview
+npm run build       # tsc -b && vite build && copy 404.html
+npm run preview     # preview the production build locally
 ```
 
-## Install on your phone
+### Install on your phone
 
-1. **Deploy first** — service workers + install only work on HTTPS (or localhost). Push to GitHub → import on Vercel / Netlify / Cloudflare Pages — all free, all auto-detect Vite.
-2. **iOS**: open the deployed URL in Safari → tap **Share** → **Add to Home Screen**.
-3. **Android**: open in Chrome → tap the install banner, or menu → **Install app**.
+- **iOS**: open the deployed URL in Safari → Share → *Add to Home Screen*.
+- **Android**: open in Chrome → *Install app* in the menu, or tap the install banner.
 
-After install Hangr launches fullscreen with no browser chrome.
+After install, Hangr launches fullscreen.
 
-> **Production note** — for some ONNX backends to use SharedArrayBuffer (faster ML inference), you need the deployed origin to send `Cross-Origin-Embedder-Policy: credentialless` and `Cross-Origin-Opener-Policy: same-origin` headers. Hangr works without these (falls back to single-threaded WASM); they're a performance bonus. On Vercel, add a `vercel.json` with these headers if you want them.
-
-## Privacy model
-
-This is the core architectural commitment, not marketing copy:
-
-- **Photos** are stored as Blobs in IndexedDB on your device. Never uploaded.
-- **ML models** (RMBG-1.4 today, more later) run in your browser via WebGPU/WASM. Photos never leave the device for inference.
-- **Analytics** — none. No third-party scripts. Inspect the network tab; you'll see only your own assets and one model download from `huggingface.co`.
-- **Backend** — there isn't one. Hangr is a static site + your browser + IndexedDB.
-
-Cloud sync, if ever added, will be opt-in and end-to-end encrypted. The default will always be device-only.
+---
 
 ## Project structure
 
 ```
 Hangr/
-├── public/
-│   └── icon.png                 # master icon — generates all PWA sizes
+├── public/                       # static assets, PWA icons, _redirects
+├── scripts/
+│   └── copy-404.mjs              # postbuild: dist/404.html for SPA fallback
 ├── src/
-│   ├── components/
-│   │   ├── CategoryFilter.tsx
-│   │   ├── EmptyState.tsx
-│   │   ├── HangerIcon.tsx
-│   │   ├── InstallPrompt.tsx    # cross-platform A2HS prompt
-│   │   ├── ItemCard.tsx
-│   │   ├── ItemForm.tsx
-│   │   ├── ItemPickerSheet.tsx  # multi-select sheet for outfit logging
-│   │   ├── ItemRowMini.tsx      # row in leaderboards
-│   │   ├── Layout.tsx           # tab-bar shell
-│   │   ├── MiniItemThumb.tsx
-│   │   ├── Sheet.tsx            # bottom sheet primitive
-│   │   ├── StatTile.tsx
-│   │   ├── TabBar.tsx
-│   │   ├── Toaster.tsx
-│   │   └── WearTrendChart.tsx   # dependency-free bar chart
-│   ├── db/
-│   │   ├── dexie.ts             # schema (items, itemPhotos, wears)
-│   │   ├── items.ts             # item CRUD helpers
-│   │   └── wears.ts             # wear logging + queries
+│   ├── components/               # Sheets, cards, primitives
+│   │   ├── CalendarBackdateSheet.tsx
+│   │   ├── DayNoteSheet.tsx
+│   │   ├── ItemPairRow.tsx
+│   │   ├── OutfitChip / OutfitDetailSheet / OutfitEditorSheet
+│   │   ├── Sheet.tsx             # bottom-sheet primitive (calls useOverlay → fades TabBar)
+│   │   ├── TabBar.tsx            # floating capsule, 4 tabs + centred Add FAB
+│   │   ├── WantEditorSheet.tsx
+│   │   └── WearTrendChart.tsx    # tap-to-reveal weekly chart with average line
+│   ├── db/                       # Dexie helpers — go through these, not db.<table>
+│   │   ├── dexie.ts              # schema (v7), all interfaces
+│   │   ├── items.ts / itemPhotos
+│   │   ├── wears.ts              # logWear, logSavedOutfit, listRecentWearDays
+│   │   ├── outfits.ts            # saved outfits CRUD
+│   │   ├── dayNotes.ts           # per-day diary notes
+│   │   └── wants.ts              # want list
 │   ├── lib/
-│   │   ├── analytics.ts         # insights computation
-│   │   ├── bgRemoval.ts         # transformers.js + RMBG-1.4
-│   │   ├── dataExport.ts        # JSON export, delete-all, storage estimate
-│   │   ├── dates.ts
-│   │   ├── photo.ts             # resize / encode
-│   │   ├── toast.ts             # zustand toast store
-│   │   └── utils.ts
+│   │   ├── analytics.ts          # buyersRegret, dormantItems, topWornColors, computeDormantPairs, inventoryForCategory
+│   │   ├── bgRemoval.ts          # transformers.js + RMBG-1.4 (forces WASM on iOS)
+│   │   ├── detection.ts          # CLIP zero-shot category + JS palette extractor
+│   │   ├── embeddings.ts         # CLIP image-feature extraction + cosine similarity
+│   │   ├── colors.ts             # color name → hex (named + hash fallback)
+│   │   ├── occasions.ts          # OCCASIONS const
+│   │   ├── shell.ts              # useShell + useOverlay hook
+│   │   ├── wrapped.ts            # year-in-clothes PNG renderer (Canvas 2D)
+│   │   └── ...
 │   ├── routes/
-│   │   ├── Capture.tsx
-│   │   ├── Closet.tsx
-│   │   ├── Insights.tsx
-│   │   ├── ItemDetail.tsx
-│   │   ├── Log.tsx
-│   │   └── Settings.tsx
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
-├── index.html
-├── vite.config.ts
-├── pwa-assets.config.ts
-├── tailwind.config.js
+│   │   ├── Capture.tsx           # photo → bg removal → detection → duplicate check → save
+│   │   ├── BulkCapture.tsx       # gallery batch (up to 30), sequential ML, save together
+│   │   ├── Closet.tsx            # 2-col grid, category + occasion filters, want-list link
+│   │   ├── Log.tsx               # yesterday prompt, today's outfit, saved outfits, recent days
+│   │   ├── Insights.tsx          # honesty report
+│   │   ├── ItemDetail.tsx        # wear stats, edit, archive, replace photo, history
+│   │   ├── Settings.tsx          # privacy, ML toggle, storage, Wrapped, export, delete-all
+│   │   └── Wants.tsx             # pre-purchase consideration with inventory cross-check
+│   └── main.tsx
+├── .github/workflows/main.yml    # GitHub Pages deploy (build → upload-artifact → deploy-pages)
+├── vite.config.ts                # PROD_BASE = '/Hangr/' for subpath builds
+├── tailwind.config.js            # surface tokens, Fraunces + Inter, rounded-card/sheet
 └── package.json
 ```
 
-## Roadmap
+---
 
-- [x] **v0.1 — Walking skeleton.** Installable PWA, empty Dexie schema, branded landing.
-- [x] **v0.2 — Capture loop.** Camera/gallery, background removal (RMBG-1.4), save item, item detail (read-only), edit, archive, replace photo, category filter.
-- [x] **v0.3 — Wear logging.** "I wore this today" CTA, today's outfit, item picker sheet, recent days list, full wear history per item.
-- [x] **v0.4 — Honesty report.** Total stats, weekly wear trend, most-worn, best/worst CPW, dormant items, by-category breakdown.
-- [x] **v0.5 — MVP.** Settings (privacy + storage + export + delete-all), toast system, polish.
-- [ ] **v0.6 — Gmail receipt import.** Auto-populate closet from Myntra / Ajio / Amazon Fashion.
-- [ ] **v0.7 — Vibe-based outfit suggestions.** From owned items, with weather + occasion context.
-- [ ] **v0.8 — Selfie auto-log.** Mirror selfie → CLIP match → wear logged.
-- [ ] **v1.0 — Public.**
+## Status
+
+**v0.1 → v0.8 done.**
+
+- v0.1–0.5: PWA shell, capture loop with on-device bg removal + auto-detection, closet, item detail, wear logging, insights v1, settings.
+- v0.6: bulk capture (gallery batch up to 30 with sequential per-item ML).
+- v0.7: saved outfits with one-tap logging.
+- v0.8: buyer's regret, donation review, forgotten pairs, worn-colours palette, auto-suggest "save this combo," yesterday backfill prompt, day diary notes, want list with inventory check, occasion tags, calendar-grid backdate, visual duplicate detection, year-in-clothes Wrapped recap.
+- Design refresh: editorial dark UI with Fraunces + Inter, surface tokens, floating capsule TabBar with FAB, useOverlay shell pattern.
+
+**Roadmap (not built):**
+
+- Vibe-based outfit suggestions (CLIP embeddings already in place from v0.8)
+- Selfie auto-log (mirror selfie → CLIP match → wear logged)
+- Gmail receipt import (privacy-first OAuth path; deferred)
+- HEIC handling improvements
+- Code-split transformers.js (currently in main bundle)
+- Optional cloud sync with E2E encryption (only if explicitly requested)
+
+**Not viable**
+
+- Daily push notifications. Real scheduled push needs a backend (VAPID), which violates the privacy moat. The in-app "Yesterday's outfit?" prompt covers the same job-to-be-done when the user opens the app.
+
+---
+
+## Deployment
+
+The `main` branch auto-deploys to GitHub Pages via [`.github/workflows/main.yml`](.github/workflows/main.yml) — `npm ci → npm run build → upload-pages-artifact → deploy-pages@v4`.
+
+The build is subpath-aware (`base: '/Hangr/'` set in [vite.config.ts](vite.config.ts)) so the same artifact serves cleanly under `<custom-domain>/Hangr/`. SPA deep links work because [`scripts/copy-404.mjs`](scripts/copy-404.mjs) duplicates `index.html` into `404.html` for GH Pages' fallback.
+
+If you fork and want your own deploy: set `PROD_BASE` in [`vite.config.ts`](vite.config.ts) to `/<your-repo-name>/`, enable Pages on your repo with **Source = GitHub Actions**, and push to `main`. Custom-domain users on a User Pages parent shouldn't set the project's custom-domain field — leave it blank and your project inherits `<custom-domain>/<repo-name>/` automatically.
+
+---
+
+## Author
+
+Built by [Deraj](https://derajyojith.dev). Hangr is part of the same opinionated-personal-tools family as Ledgr (privacy-first finance for Indian banks) and Basho (map-based trip planner) — same flavour of "I want this in my life" software.
+
+---
 
 ## License
 
-TBD — private during build-out.
+[MIT](LICENSE) — fork it, build on it, ship your own. If you do something cool with it, I'd love to see it (open an issue or ping me).
