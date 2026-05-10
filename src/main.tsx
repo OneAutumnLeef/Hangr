@@ -5,9 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
 import { installDiagnostics } from './lib/diagnostics'
+import { trackVisit } from './lib/visitTracker'
 
 // Install before anything else so we capture even early init errors.
 installDiagnostics()
+
+// Fire-and-forget: bumps the cross-app visit counter (one per session).
+void trackVisit()
 
 const queryClient = new QueryClient({
   defaultOptions: {
