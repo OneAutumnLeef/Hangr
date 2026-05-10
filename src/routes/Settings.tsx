@@ -305,58 +305,57 @@ export function Settings() {
           <span className="text-[12px] text-tertiary tabular-nums">v0.7</span>
         </Row>
 
-        {/* Demo + danger actions — separated from the regular rows */}
+        {/* Demo + danger actions — separated from the regular rows.
+            These are visible in production too so the deployed site can be
+            seeded for testing or demoing. Remove the whole block (and the
+            seedData.ts file) when the app graduates from solo use. */}
         <div className="pt-12">
-          {/* TEMP — dev-only demo seeder. Remove this block + the
-              handleSeed function + the seedExampleData import once done. */}
-          {import.meta.env.DEV && (
-            <>
-              <RowButton onClick={handleSeed} disabled={busy}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] text-ink-50">Add example data</div>
-                  <div className="mt-0.5 text-[12px] text-tertiary">
-                    Dev-only · ~20 sample items, 90 days of wears, 2 outfits
-                  </div>
-                </div>
-                <Sparkles
-                  size={18}
-                  strokeWidth={1.75}
-                  className="text-accent shrink-0"
-                />
-              </RowButton>
+          <RowButton onClick={handleSeed} disabled={busy}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[15px] text-ink-50">Add example data</div>
+              <div className="mt-0.5 text-[12px] text-tertiary">
+                ~20 sample items, 90 days of wears, 2 outfits — additive to
+                whatever's already here.
+              </div>
+            </div>
+            <Sparkles
+              size={18}
+              strokeWidth={1.75}
+              className="text-accent shrink-0"
+            />
+          </RowButton>
 
-              <RowButton onClick={handleFillPhotos} disabled={busy}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] text-ink-50">Fill missing photos</div>
-                  <div className="mt-0.5 text-[12px] text-tertiary">
-                    Dev-only · canvas placeholders coloured from each item's color
-                  </div>
-                </div>
-                <ImageIcon
-                  size={18}
-                  strokeWidth={1.75}
-                  className="text-accent shrink-0"
-                />
-              </RowButton>
+          <RowButton onClick={handleFillPhotos} disabled={busy}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[15px] text-ink-50">Fill missing photos</div>
+              <div className="mt-0.5 text-[12px] text-tertiary">
+                Canvas placeholders coloured from each item's color, for items
+                added without a real photo.
+              </div>
+            </div>
+            <ImageIcon
+              size={18}
+              strokeWidth={1.75}
+              className="text-accent shrink-0"
+            />
+          </RowButton>
 
-              <RowButton onClick={handleBackfillEmbeddings} disabled={busy}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] text-ink-50">
-                    Index for duplicate detection
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-tertiary">
-                    Compute CLIP embeddings for existing items so capture warns
-                    when you may already own something similar.
-                  </div>
-                </div>
-                <Search
-                  size={18}
-                  strokeWidth={1.75}
-                  className="text-accent shrink-0"
-                />
-              </RowButton>
-            </>
-          )}
+          <RowButton onClick={handleBackfillEmbeddings} disabled={busy}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[15px] text-ink-50">
+                Index for duplicate detection
+              </div>
+              <div className="mt-0.5 text-[12px] text-tertiary">
+                Compute CLIP embeddings for existing items so capture warns
+                when you may already own something similar.
+              </div>
+            </div>
+            <Search
+              size={18}
+              strokeWidth={1.75}
+              className="text-accent shrink-0"
+            />
+          </RowButton>
 
           <RowButton
             onClick={() => setConfirmDelete(true)}
