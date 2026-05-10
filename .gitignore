@@ -34,5 +34,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Local AI / tooling state — Claude Code permissions, knowledge-graph caches,
+# TS incremental build info. None of this is meaningful to other contributors.
+.claude/
+graphify-out/
+*.tsbuildinfo
+
 # PWA assets are committed so deployed builds always have the icons.
 # Regenerate via `npm run generate-pwa-assets` whenever icon.png changes.
